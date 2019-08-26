@@ -89,8 +89,9 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
 
     public NettyRemotingServer(final NettyServerConfig nettyServerConfig,
         final ChannelEventListener channelEventListener) {
+        //todo oneway信号量，async的信号量--目测应该限流用
         super(nettyServerConfig.getServerOnewaySemaphoreValue(), nettyServerConfig.getServerAsyncSemaphoreValue());
-        this.serverBootstrap = new ServerBootstrap();
+        this.serverBootstrap = new ServerBootstrap();//netty的serverBootstrap
         this.nettyServerConfig = nettyServerConfig;
         this.channelEventListener = channelEventListener;
 
@@ -108,6 +109,7 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
             }
         });
 
+        //看名字就是netty的boostGroup
         this.eventLoopGroupBoss = new NioEventLoopGroup(1, new ThreadFactory() {
             private AtomicInteger threadIndex = new AtomicInteger(0);
 
@@ -179,36 +181,39 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
             });
 
         ServerBootstrap childHandler =
-            this.serverBootstrap.group(this.eventLoopGroupBoss, this.eventLoopGroupSelector)
+            this.serverBootstrap.group(this.eventLoopGroupBoss, this.eventLoopGroupSelector)//bossgruop和workgroup
                 .channel(useEpoll() ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
-                .option(ChannelOption.SO_BACKLOG, 1024)
-                .option(ChannelOption.SO_REUSEADDR, true)
+                .option(ChannelOption.SO_BACKLOG, 1024)//listerner的长度，过小会导致tcp链接简历失败
+                .option(ChannelOption.SO_REUSEADDR, true)//服务器端口可被重用
                 .option(ChannelOption.SO_KEEPALIVE, false)
-                .childOption(ChannelOption.TCP_NODELAY, true)
-                .childOption(ChannelOption.SO_SNDBUF, nettyServerConfig.getServerSocketSndBufSize())
-                .childOption(ChannelOption.SO_RCVBUF, nettyServerConfig.getServerSocketRcvBufSize())
-                .localAddress(new InetSocketAddress(this.nettyServerConfig.getListenPort()))
+                .childOption(ChannelOption.TCP_NODELAY, true)//禁用Nagle算法，有效提高网络负载
+                .childOption(ChannelOption.SO_SNDBUF, nettyServerConfig.getServerSocketSndBufSize())//发送缓冲区大小
+                .childOption(ChannelOption.SO_RCVBUF, nettyServerConfig.getServerSocketRcvBufSize())//接受缓冲区大小
+                .localAddress(new InetSocketAddress(this.nettyServerConfig.getListenPort()))//设置端口
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch) throws Exception {
+                        //注意：使用第三个EventGroup,defaultEventExecutorGroup，建立链接、读写任务分开
                         ch.pipeline()
                             .addLast(defaultEventExecutorGroup, HANDSHAKE_HANDLER_NAME,
                                 new HandshakeHandler(TlsSystemConfig.tlsMode))
                             .addLast(defaultEventExecutorGroup,
-                                new NettyEncoder(),
-                                new NettyDecoder(),
-                                new IdleStateHandler(0, 0, nettyServerConfig.getServerChannelMaxIdleTimeSeconds()),
-                                new NettyConnectManageHandler(),
-                                new NettyServerHandler()
+                                new NettyEncoder(),//MessageToByteEncoder
+                                new NettyDecoder(),//LengthFieldBasedFrameDecoder具体见netty,解决粘包问题
+                                new IdleStateHandler(0, 0, nettyServerConfig.getServerChannelMaxIdleTimeSeconds()),//心跳检测机制
+                                new NettyConnectManageHandler(),//处理io链接相关的事件注意啊channelActive,channelInActive,userEventTriggered（心跳）,exceptionCaught
+                                new NettyServerHandler()//处理request和response信息
                             );
                     }
                 });
 
         if (nettyServerConfig.isServerPooledByteBufAllocatorEnable()) {
+            //重用缓冲区
             childHandler.childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);
         }
 
         try {
+            //监听端口
             ChannelFuture sync = this.serverBootstrap.bind().sync();
             InetSocketAddress addr = (InetSocketAddress) sync.channel().localAddress();
             this.port = addr.getPort();
@@ -216,10 +221,14 @@ public class NettyRemotingServer extends NettyRemotingAbstract implements Remoti
             throw new RuntimeException("this.serverBootstrap.bind().sync() InterruptedException", e1);
         }
 
+        //netty的事件处理类
+        // 1.nettyEventExecutor是一个线程，run里是死循环，nettyEventExecutor维护了个阻塞队列，采用生产者消费者模式。putNettEvent放事件，线程异步消费事件
+        // 2.事件来了后，通过NettyRemotingServer.this.channelEventListener方法类处理事件
         if (this.channelEventListener != null) {
             this.nettyEventExecutor.start();
         }
 
+        //定期检查错误的request
         this.timer.scheduleAtFixedRate(new TimerTask() {
 
             @Override
