@@ -61,27 +61,35 @@ public class NamesrvController {
     private FileWatchService fileWatchService;
 
     public NamesrvController(NamesrvConfig namesrvConfig, NettyServerConfig nettyServerConfig) {
+        //nameserver的配置
         this.namesrvConfig = namesrvConfig;
+        //netty相关的配置
         this.nettyServerConfig = nettyServerConfig;
+        //kv存储的管理类
         this.kvConfigManager = new KVConfigManager(this);
+        //broker topic的信息管理
         this.routeInfoManager = new RouteInfoManager();
+        //broker心跳的类，是ChannelEventListener的实现类，Netty的事件触发后处理事件的详细的类，具体调用见NettyConnectManageHandler
         this.brokerHousekeepingService = new BrokerHousekeepingService(this);
         this.configuration = new Configuration(
             log,
             this.namesrvConfig, this.nettyServerConfig
         );
+        //storePath的保存
         this.configuration.setStorePathFromConfig(this.namesrvConfig, "configStorePath");
     }
 
     public boolean initialize() {
 
+        //kv设置load到内存
         this.kvConfigManager.load();
 
+        //核心：创建nettyserver
         this.remotingServer = new NettyRemotingServer(this.nettyServerConfig, this.brokerHousekeepingService);
 
+        //远程命令处理类,在NettyRemotingAbstract的
         this.remotingExecutor =
             Executors.newFixedThreadPool(nettyServerConfig.getServerWorkerThreads(), new ThreadFactoryImpl("RemotingExecutorThread_"));
-
         this.registerProcessor();
 
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
