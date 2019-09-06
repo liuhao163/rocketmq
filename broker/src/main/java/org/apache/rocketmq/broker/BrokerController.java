@@ -187,6 +187,8 @@ public class BrokerController {
         this.broker2Client = new Broker2Client(this);//todo ??疑问
 
         this.subscriptionGroupManager = new SubscriptionGroupManager(this);//todo ??疑问
+
+        //broker和外部系统沟通的适配层，有几个功能：（1）和name server交互，进行broker节点的注册和取消；（2）和其他broker节点交互；
         this.brokerOuterAPI = new BrokerOuterAPI(nettyClientConfig);
         this.filterServerManager = new FilterServerManager(this);
 
@@ -552,7 +554,7 @@ public class BrokerController {
         this.fastRemotingServer.registerProcessor(RequestCode.VIEW_MESSAGE_BY_ID, queryProcessor, this.queryMessageExecutor);
 
         /**
-         * ClientManageProcessor
+         * ClientManageProcessor 处理心跳包等
          */
         ClientManageProcessor clientProcessor = new ClientManageProcessor(this);
         this.remotingServer.registerProcessor(RequestCode.HEART_BEAT, clientProcessor, this.heartbeatExecutor);
@@ -810,30 +812,37 @@ public class BrokerController {
     }
 
     public void start() throws Exception {
+        //message保存模块 重要
         if (this.messageStore != null) {
             this.messageStore.start();
         }
 
+        //netty的server端broker监听的端口 重要
         if (this.remotingServer != null) {
             this.remotingServer.start();
         }
 
+        //netty的server端 remotingServer端口-2 不知道有什么用
         if (this.fastRemotingServer != null) {
             this.fastRemotingServer.start();
         }
 
+        //文件监听类，和ssl有关不重要
         if (this.fileWatchService != null) {
             this.fileWatchService.start();
         }
 
+        //nettyclient对外和nameserver以及其他broker交互
         if (this.brokerOuterAPI != null) {
             this.brokerOuterAPI.start();
         }
 
+        //处理ResponseCode.PULL_NOT_FOUND等异常状态的消息
         if (this.pullRequestHoldService != null) {
             this.pullRequestHoldService.start();
         }
 
+        //心跳的服务
         if (this.clientHousekeepingService != null) {
             this.clientHousekeepingService.start();
         }
