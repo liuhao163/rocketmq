@@ -842,15 +842,17 @@ public class BrokerController {
             this.pullRequestHoldService.start();
         }
 
-        //心跳的服务
+        //处理系统服务服务
         if (this.clientHousekeepingService != null) {
             this.clientHousekeepingService.start();
         }
 
+        //启动filterServer
         if (this.filterServerManager != null) {
             this.filterServerManager.start();
         }
 
+        //todo mark
         this.registerBrokerAll(true, false, true);
 
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
