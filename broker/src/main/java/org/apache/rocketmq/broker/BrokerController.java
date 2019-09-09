@@ -852,9 +852,10 @@ public class BrokerController {
             this.filterServerManager.start();
         }
 
-        //todo mark
+        //向nameserv发送数据进行broker的注册，注意非单向的equestCode.QUERY_DATA_VERSION,
         this.registerBrokerAll(true, false, true);
 
+        //每隔一段时间注册一下broker
         this.scheduledExecutorService.scheduleAtFixedRate(new Runnable() {
 
             @Override
@@ -871,13 +872,16 @@ public class BrokerController {
             this.brokerStatsManager.start();
         }
 
+        //快速返回失败...开启之后每隔10ms会清理过去的request请求，见代码start
         if (this.brokerFastFailure != null) {
             this.brokerFastFailure.start();
         }
 
+        //主的broker开始事物检查
         if (BrokerRole.SLAVE != messageStoreConfig.getBrokerRole()) {
             if (this.transactionalMessageCheckService != null) {
                 log.info("Start transaction service!");
+                //run方法里的死循环wait一段时间，然后onWaitEnd中check()
                 this.transactionalMessageCheckService.start();
             }
         }
@@ -955,6 +959,7 @@ public class BrokerController {
         }
     }
 
+    //todo
     private boolean needRegister(final String clusterName,
         final String brokerAddr,
         final String brokerName,
