@@ -231,6 +231,7 @@ public class RemotingCommand {
         this.customHeader = customHeader;
     }
 
+    //发射创建各自的CommandCustomHeader
     public CommandCustomHeader decodeCommandCustomHeader(
         Class<? extends CommandCustomHeader> classHeader) throws RemotingCommandException {
         CommandCustomHeader objectHeader;
