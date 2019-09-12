@@ -191,24 +191,30 @@ public class MappedFileQueue {
         return 0;
     }
 
+    //重点方法
     public MappedFile getLastMappedFile(final long startOffset, boolean needCreate) {
         long createOffset = -1;
         MappedFile mappedFileLast = getLastMappedFile();
-
+        //文件不存在
         if (mappedFileLast == null) {
+            //这段代码的意思是：createOffset是mappedFileSize（1g）的倍数，从0开始
+            //例如start是100，那createOffset创建0在写100
             createOffset = startOffset - (startOffset % this.mappedFileSize);
         }
-
+        //文件已经满了
         if (mappedFileLast != null && mappedFileLast.isFull()) {
+            //通过文件名获取新文件的偏移量，当前最后一个文件的启示偏移量+文件大小
             createOffset = mappedFileLast.getFileFromOffset() + this.mappedFileSize;
         }
 
+        //不等于-1并且needCreate创建
         if (createOffset != -1 && needCreate) {
             String nextFilePath = this.storePath + File.separator + UtilAll.offset2FileName(createOffset);
             String nextNextFilePath = this.storePath + File.separator
                 + UtilAll.offset2FileName(createOffset + this.mappedFileSize);
             MappedFile mappedFile = null;
 
+            //broker中，DefaultMessageStore中的allocateMappedFileService创建文件
             if (this.allocateMappedFileService != null) {
                 mappedFile = this.allocateMappedFileService.putRequestAndReturnMappedFile(nextFilePath,
                     nextNextFilePath, this.mappedFileSize);
