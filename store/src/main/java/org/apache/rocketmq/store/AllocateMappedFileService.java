@@ -49,7 +49,7 @@ public class AllocateMappedFileService extends ServiceThread {
     }
 
     /**
-     * 生产者消费者模式。
+     * 生产者消费者模式。同步的放文件到队列中，线程中异步的去创建文件，
      * @param nextFilePath
      * @param nextNextFilePath
      * @param fileSize
@@ -101,6 +101,7 @@ public class AllocateMappedFileService extends ServiceThread {
             return null;
         }
 
+        //一次创建俩个文件nextFile和nextNextFile，nextFile异步转同步返回，nextNextFile下一次创建时候可以直接到这里，
         AllocateRequest result = this.requestTable.get(nextFilePath);
         try {
             if (result != null) {
@@ -145,6 +146,7 @@ public class AllocateMappedFileService extends ServiceThread {
         }
     }
 
+    //创建文件操作
     public void run() {
         log.info(this.getServiceName() + " service started");
 
@@ -161,7 +163,9 @@ public class AllocateMappedFileService extends ServiceThread {
         boolean isSuccess = false;
         AllocateRequest req = null;
         try {
+            //获取请求
             req = this.requestQueue.take();
+            //校验请求状态
             AllocateRequest expectedRequest = this.requestTable.get(req.getFilePath());
             if (null == expectedRequest) {
                 log.warn("this mmap request expired, maybe cause timeout " + req.getFilePath() + " "
@@ -178,6 +182,7 @@ public class AllocateMappedFileService extends ServiceThread {
                 long beginTime = System.currentTimeMillis();
 
                 MappedFile mappedFile;
+                //TransientStorePool和MappedFileByteBuffer
                 if (messageStore.getMessageStoreConfig().isTransientStorePoolEnable()) {
                     try {
                         mappedFile = ServiceLoader.load(MappedFile.class).iterator().next();

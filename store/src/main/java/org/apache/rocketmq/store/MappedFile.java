@@ -62,6 +62,9 @@ public class MappedFile extends ReferenceResource {
      * Message will put to here first, and then reput to FileChannel if writeBuffer is not null.
      */
     protected ByteBuffer writeBuffer = null;
+    /**
+     * 异步刷盘才有效，直接ByteBuffer.allocateDirect申请堆外内存，通过transientStorePoolEnable开启
+     */
     protected TransientStorePool transientStorePool = null;
     private String fileName;
     //映射的起始偏移量
