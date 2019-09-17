@@ -1170,6 +1170,7 @@ public class CommitLog {
     class DefaultAppendMessageCallback implements AppendMessageCallback {
         // File at the end of the minimum fixed length empty
         private static final int END_FILE_MIN_BLANK_LENGTH = 4 + 4;
+        //保存计算的msgId
         private final ByteBuffer msgIdMemory;
         // Store the message content
         private final ByteBuffer msgStoreItemMemory;
@@ -1180,6 +1181,7 @@ public class CommitLog {
 
         private final StringBuilder msgIdBuilder = new StringBuilder();
 
+        //保存host信息的ByteBuffer
         private final ByteBuffer hostHolder = ByteBuffer.allocate(8);
 
         DefaultAppendMessageCallback(final int size) {
@@ -1195,9 +1197,9 @@ public class CommitLog {
         /**
          *
          * @param fileFromOffset 文件其实的自己数1G的整数倍
-         * @param byteBuffer
-         * @param maxBlank
-         * @param msgInner
+         * @param byteBuffer mappedByteBuffer的子缓冲区
+         * @param maxBlank 空余byteslength
+         * @param msgInner 消息体
          * @return
          */
         public AppendMessageResult doAppend(final long fileFromOffset, final ByteBuffer byteBuffer, final int maxBlank,
@@ -1207,7 +1209,11 @@ public class CommitLog {
             // PHY OFFSET =文件起始的位置+当前写的位置
             long wroteOffset = fileFromOffset + byteBuffer.position();
 
+            //计算msgId
             this.resetByteBuffer(hostHolder, 8);
+            //msgIdMemory+16位 MSG_ID_LENGTH=8+8具体见下面
+            //msgInner.getStoreHostBytes(hostHolder)总共8位=Addr数组+port
+            //wroteOffset long类型占8位
             String msgId = MessageDecoder.createMessageId(this.msgIdMemory, msgInner.getStoreHostBytes(hostHolder), wroteOffset);
 
             // Record ConsumeQueue information
@@ -1215,14 +1221,15 @@ public class CommitLog {
             keyBuilder.append(msgInner.getTopic());
             keyBuilder.append('-');
             keyBuilder.append(msgInner.getQueueId());
-            String key = keyBuilder.toString();
+            String key = keyBuilder.toString(); // topic-queueid
+            //get queue current offset
             Long queueOffset = CommitLog.this.topicQueueTable.get(key);
             if (null == queueOffset) {
                 queueOffset = 0L;
                 CommitLog.this.topicQueueTable.put(key, queueOffset);
             }
 
-            // Transaction messages that require special handling
+            // Transaction messages that require special handling 处理事物消息待看
             final int tranType = MessageSysFlag.getTransactionValue(msgInner.getSysFlag());
             switch (tranType) {
                 // Prepared and Rollback message is not consumed, will not enter the
@@ -1240,6 +1247,8 @@ public class CommitLog {
             /**
              * Serialize message
              */
+
+            //获取properties
             final byte[] propertiesData =
                     msgInner.getPropertiesString() == null ? null : msgInner.getPropertiesString().getBytes(MessageDecoder.CHARSET_UTF8);
 
@@ -1249,15 +1258,16 @@ public class CommitLog {
                 log.warn("putMessage message properties length too long. length={}", propertiesData.length);
                 return new AppendMessageResult(AppendMessageStatus.PROPERTIES_SIZE_EXCEEDED);
             }
-
+            //获取topic信息
             final byte[] topicData = msgInner.getTopic().getBytes(MessageDecoder.CHARSET_UTF8);
             final int topicLength = topicData.length;
 
             final int bodyLength = msgInner.getBody() == null ? 0 : msgInner.getBody().length;
 
+            //计算消息的长度
             final int msgLen = calMsgLength(bodyLength, topicLength, propertiesLength);
 
-            // Exceeds the maximum message
+            // Exceeds the maximum message 默认是512k
             if (msgLen > this.maxMessageSize) {
                 CommitLog.log.warn("message size exceeded, msg total size: " + msgLen + ", msg body size: " + bodyLength
                         + ", maxMessageSize: " + this.maxMessageSize);
@@ -1279,7 +1289,7 @@ public class CommitLog {
                         queueOffset, CommitLog.this.defaultMessageStore.now() - beginTimeMills);
             }
 
-            // Initialization of storage space
+            // Initialization of storage space 初始化读取空间先flip在设置limit
             this.resetByteBuffer(msgStoreItemMemory, msgLen);
             // 1 TOTALSIZE
             this.msgStoreItemMemory.putInt(msgLen);

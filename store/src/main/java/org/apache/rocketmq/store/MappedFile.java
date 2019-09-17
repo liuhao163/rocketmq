@@ -210,16 +210,16 @@ public class MappedFile extends ReferenceResource {
         assert messageExt != null;
         assert cb != null;
 
-        //写的position
+        //写的position，如果还有空余
         int currentPos = this.wrotePosition.get();
-
         if (currentPos < this.fileSize) {
             //缓冲区切片，获取子缓冲区，position=0，起始位置是主缓冲区的position，容量是limit-position看，这里是指写缓冲区中，剩下的缓冲区。
             ByteBuffer byteBuffer = writeBuffer != null ? writeBuffer.slice() : this.mappedByteBuffer.slice();
-            //todo 这一步的作用是什么??
+            //设置当前消息写的position
             byteBuffer.position(currentPos);
             AppendMessageResult result = null;
             if (messageExt instanceof MessageExtBrokerInner) {
+                //文件开始位置，写的bytebuffer，剩余位置，消息体
                 result = cb.doAppend(this.getFileFromOffset(), byteBuffer, this.fileSize - currentPos, (MessageExtBrokerInner) messageExt);
             } else if (messageExt instanceof MessageExtBatch) {
                 result = cb.doAppend(this.getFileFromOffset(), byteBuffer, this.fileSize - currentPos, (MessageExtBatch) messageExt);
