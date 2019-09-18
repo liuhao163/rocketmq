@@ -228,11 +228,12 @@ public class MQClientInstance {
                     this.serviceState = ServiceState.START_FAILED;
                     // If not specified,looking address from name server
                     if (null == this.clientConfig.getNamesrvAddr()) {
+                        //感觉是服务发现
                         this.mQClientAPIImpl.fetchNameServerAddr();
                     }
-                    // Start request-response channel
+                    // Start request-response channel 处理rocktmq的coumser相关的系统事件和CONSUME_MESSAGE_DIRECTLY等信息
                     this.mQClientAPIImpl.start();
-                    // Start various schedule tasks
+                    // Start various schedule tasks 服务发现的任务
                     this.startScheduledTask();
                     // Start pull service
                     this.pullMessageService.start();
