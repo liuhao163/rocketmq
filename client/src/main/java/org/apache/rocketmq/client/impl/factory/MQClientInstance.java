@@ -233,7 +233,7 @@ public class MQClientInstance {
                     }
                     // Start request-response channel 处理rocktmq的coumser相关的系统事件和CONSUME_MESSAGE_DIRECTLY等信息
                     this.mQClientAPIImpl.start();
-                    // Start various schedule tasks 服务发现的任务
+                    // Start various schedule tasks 服务发现的任务保证服务的发现
                     this.startScheduledTask();
                     // Start pull service
                     this.pullMessageService.start();
