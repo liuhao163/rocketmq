@@ -47,7 +47,7 @@ public class Validators {
     }
 
     /**
-     * Validate group
+     * Validate group 不为空、只能字母数字中划线，并且不能超过255
      */
     public static void checkGroup(String group) throws MQClientException {
         if (UtilAll.isBlank(group)) {
@@ -101,7 +101,7 @@ public class Validators {
     }
 
     /**
-     * Validate topic
+     * Validate topic 不为空、只能字母数字中划线，并且不能是保留的保留字段
      */
     public static void checkTopic(String topic) throws MQClientException {
         if (UtilAll.isBlank(topic)) {

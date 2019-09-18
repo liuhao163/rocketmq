@@ -148,17 +148,22 @@ public class DefaultMQProducerImpl implements MQProducerInner {
 
     public void start(final boolean startFactory) throws MQClientException {
         switch (this.serviceState) {
+            //启动时候默认是是这个状态防止重复启动
             case CREATE_JUST:
                 this.serviceState = ServiceState.START_FAILED;
 
+                //检查producerGroup名称合法性
                 this.checkConfig();
 
+                // 判断是否需要设置 InstanceName （不等于CLIENT_INNER_PRODUCER_GROUP，并且InstanceName是default）
                 if (!this.defaultMQProducer.getProducerGroup().equals(MixAll.CLIENT_INNER_PRODUCER_GROUP)) {
                     this.defaultMQProducer.changeInstanceNameToPID();
                 }
 
+                //多例模式创建MQClientInstance
                 this.mQClientFactory = MQClientManager.getInstance().getAndCreateMQClientInstance(this.defaultMQProducer, rpcHook);
 
+                //注册Producer
                 boolean registerOK = mQClientFactory.registerProducer(this.defaultMQProducer.getProducerGroup(), this);
                 if (!registerOK) {
                     this.serviceState = ServiceState.CREATE_JUST;
@@ -167,8 +172,10 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                         null);
                 }
 
+                //topic:"TBW102"--->new TopicPublishInfo() 存入topicPublishInfoTable
                 this.topicPublishInfoTable.put(this.defaultMQProducer.getCreateTopicKey(), new TopicPublishInfo());
 
+                //启动
                 if (startFactory) {
                     mQClientFactory.start();
                 }
