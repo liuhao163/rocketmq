@@ -140,6 +140,7 @@ public class MQClientInstance {
 
         this.mQAdminImpl = new MQAdminImpl(this);
 
+        //拉取Message
         this.pullMessageService = new PullMessageService(this);
 
         this.rebalanceService = new RebalanceService(this);
@@ -235,11 +236,11 @@ public class MQClientInstance {
                     this.mQClientAPIImpl.start();
                     // Start various schedule tasks 服务发现的任务保证服务的发现
                     this.startScheduledTask();
-                    // Start pull service
+                    // Start pull service  启动pullMessageService通过queue拉取线程
                     this.pullMessageService.start();
-                    // Start rebalance service
+                    // Start rebalance service 每隔一段时间执行一次doReblance方法
                     this.rebalanceService.start();
-                    // Start push service
+                    // Start push service 启动push服务
                     this.defaultMQProducer.getDefaultMQProducerImpl().start(false);
                     log.info("the client factory [{}] start OK", this.clientId);
                     this.serviceState = ServiceState.RUNNING;

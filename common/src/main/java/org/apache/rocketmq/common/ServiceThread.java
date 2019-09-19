@@ -33,6 +33,7 @@ public abstract class ServiceThread implements Runnable {
     protected volatile boolean stopped = false;
 
     public ServiceThread() {
+        //service实现了runnable。start之后执行实现类的run方法
         this.thread = new Thread(this, this.getServiceName());
     }
 
@@ -50,11 +51,13 @@ public abstract class ServiceThread implements Runnable {
         this.stopped = true;
         log.info("shutdown thread " + this.getServiceName() + " interrupt " + interrupt);
 
+        //中断 serviceThread
         if (hasNotified.compareAndSet(false, true)) {
             waitPoint.countDown(); // notify
         }
 
         try {
+            //中断thread
             if (interrupt) {
                 this.thread.interrupt();
             }
@@ -109,7 +112,7 @@ public abstract class ServiceThread implements Runnable {
             return;
         }
 
-        //entry to wait
+        //entry to
         waitPoint.reset();
 
         try {
