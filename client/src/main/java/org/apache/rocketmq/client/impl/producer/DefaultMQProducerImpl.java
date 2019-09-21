@@ -691,6 +691,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         }
     }
 
+    //TODO MARK
     private SendResult sendKernelImpl(final Message msg,
                                       final MessageQueue mq,
                                       final CommunicationMode communicationMode,
