@@ -75,6 +75,7 @@ public class TopicPublishInfo {
                 int pos = Math.abs(index++) % this.messageQueueList.size();
                 if (pos < 0)
                     pos = 0;
+                //如果不是lastBrokerName返回如果是继续循环知道不是，或者循环结束
                 MessageQueue mq = this.messageQueueList.get(pos);
                 if (!mq.getBrokerName().equals(lastBrokerName)) {
                     return mq;

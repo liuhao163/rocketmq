@@ -22,6 +22,7 @@ import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+
 import org.apache.rocketmq.client.common.ThreadLocalIndex;
 
 public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> {
@@ -29,6 +30,13 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
 
     private final ThreadLocalIndex whichItemWorst = new ThreadLocalIndex();
 
+    /**
+     * 更新对象的时延级别
+     *
+     * @param name                 brokername等
+     * @param currentLatency       当前操作花费时间
+     * @param notAvailableDuration 不可用时长
+     */
     @Override
     public void updateFaultItem(final String name, final long currentLatency, final long notAvailableDuration) {
         FaultItem old = this.faultItemTable.get(name);
@@ -50,6 +58,7 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
 
     @Override
     public boolean isAvailable(final String name) {
+        //为空或者不可用时间已经过期
         final FaultItem faultItem = this.faultItemTable.get(name);
         if (faultItem != null) {
             return faultItem.isAvailable();
@@ -72,6 +81,7 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
         }
 
         if (!tmpList.isEmpty()) {
+            //??
             Collections.shuffle(tmpList);
 
             Collections.sort(tmpList);
@@ -91,9 +101,9 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
     @Override
     public String toString() {
         return "LatencyFaultToleranceImpl{" +
-            "faultItemTable=" + faultItemTable +
-            ", whichItemWorst=" + whichItemWorst +
-            '}';
+                "faultItemTable=" + faultItemTable +
+                ", whichItemWorst=" + whichItemWorst +
+                '}';
     }
 
     class FaultItem implements Comparable<FaultItem> {
@@ -162,10 +172,10 @@ public class LatencyFaultToleranceImpl implements LatencyFaultTolerance<String> 
         @Override
         public String toString() {
             return "FaultItem{" +
-                "name='" + name + '\'' +
-                ", currentLatency=" + currentLatency +
-                ", startTimestamp=" + startTimestamp +
-                '}';
+                    "name='" + name + '\'' +
+                    ", currentLatency=" + currentLatency +
+                    ", startTimestamp=" + startTimestamp +
+                    '}';
         }
 
         public String getName() {
