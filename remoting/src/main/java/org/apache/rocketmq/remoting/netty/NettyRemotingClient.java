@@ -396,6 +396,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
 
     private Channel getAndCreateChannel(final String addr) throws InterruptedException {
         if (null == addr) {
+            //如果adddr为空返回nameserver的连接
             return getAndCreateNameserverChannel();
         }
 
@@ -456,6 +457,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
 
     private Channel createChannel(final String addr) throws InterruptedException {
         ChannelWrapper cw = this.channelTables.get(addr);
+        //重连
         if (cw != null && cw.isOK()) {
             cw.getChannel().close();
             channelTables.remove(addr);
@@ -544,6 +546,7 @@ public class NettyRemotingClient extends NettyRemotingAbstract implements Remoti
     @Override
     public void invokeOneway(String addr, RemotingCommand request, long timeoutMillis) throws InterruptedException,
         RemotingConnectException, RemotingTooMuchRequestException, RemotingTimeoutException, RemotingSendRequestException {
+        //get or create Channel
         final Channel channel = this.getAndCreateChannel(addr);
         if (channel != null && channel.isActive()) {
             try {

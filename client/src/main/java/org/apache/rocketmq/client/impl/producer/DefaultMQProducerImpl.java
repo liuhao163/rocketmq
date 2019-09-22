@@ -501,8 +501,8 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     }
 
     /**
-     * //默认不用指定mq以及不需要通过mqSelector方法的实现，
-     *
+     * 默认不用指定mq以及不需要通过mqSelector方法的实现，实现上最后调用sendKernelImpl
+     * selectQueue采用了
      * @param msg               消息
      * @param communicationMode SYNC ASYNC ONEWAY
      * @param sendCallback      ASYNC模式时候的作用
@@ -557,7 +557,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                         //发送
                         sendResult = this.sendKernelImpl(msg, mq, communicationMode, sendCallback, topicPublishInfo, timeout - costTime);
                         endTimestamp = System.currentTimeMillis();
-                        //计算不可用市场
+                        //计算不可用时长
                         this.updateFaultItem(mq.getBrokerName(), endTimestamp - beginTimestampPrev, false);
                         switch (communicationMode) {
                             case ASYNC:
@@ -691,7 +691,19 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         }
     }
 
-    //TODO MARK
+    /**
+     * @param msg
+     * @param mq                write-message-queue
+     * @param communicationMode async sync oneway
+     * @param sendCallback
+     * @param topicPublishInfo
+     * @param timeout
+     * @return
+     * @throws MQClientException
+     * @throws RemotingException
+     * @throws MQBrokerException
+     * @throws InterruptedException
+     */
     private SendResult sendKernelImpl(final Message msg,
                                       final MessageQueue mq,
                                       final CommunicationMode communicationMode,
@@ -699,6 +711,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                                       final TopicPublishInfo topicPublishInfo,
                                       final long timeout) throws MQClientException, RemotingException, MQBrokerException, InterruptedException {
         long beginStartTime = System.currentTimeMillis();
+        //得到BrokerAddr，没有在更新topic
         String brokerAddr = this.mQClientFactory.findBrokerAddressInPublish(mq.getBrokerName());
         if (null == brokerAddr) {
             tryToFindTopicPublishInfo(mq.getTopic());
@@ -707,6 +720,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
 
         SendMessageContext context = null;
         if (brokerAddr != null) {
+            //根据配置返回VipChannel
             brokerAddr = MixAll.brokerVIPChannel(this.defaultMQProducer.isSendMessageWithVIPChannel(), brokerAddr);
 
             byte[] prevBody = msg.getBody();
@@ -716,6 +730,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                     MessageClientIDSetter.setUniqID(msg);
                 }
 
+                //压缩单体的消息messagebody
                 int sysFlag = 0;
                 boolean msgBodyCompressed = false;
                 if (this.tryToCompressMessage(msg)) {
@@ -723,11 +738,13 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                     msgBodyCompressed = true;
                 }
 
+                //是否事务消息
                 final String tranMsg = msg.getProperty(MessageConst.PROPERTY_TRANSACTION_PREPARED);
                 if (tranMsg != null && Boolean.parseBoolean(tranMsg)) {
                     sysFlag |= MessageSysFlag.TRANSACTION_PREPARED_TYPE;
                 }
 
+                //执行CheckForbiddenHook
                 if (hasCheckForbiddenHook()) {
                     CheckForbiddenContext checkForbiddenContext = new CheckForbiddenContext();
                     checkForbiddenContext.setNameSrvAddr(this.defaultMQProducer.getNamesrvAddr());
@@ -740,6 +757,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                     this.executeCheckForbiddenHook(checkForbiddenContext);
                 }
 
+                //执行SendMessageHookBefore
                 if (this.hasSendMessageHook()) {
                     context = new SendMessageContext();
                     context.setProducer(this);
@@ -773,6 +791,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                 requestHeader.setReconsumeTimes(0);
                 requestHeader.setUnitMode(this.isUnitMode());
                 requestHeader.setBatch(msg instanceof MessageBatch);
+                //如果是重复消费的次数
                 if (requestHeader.getTopic().startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
                     String reconsumeTimes = MessageAccessor.getReconsumeTime(msg);
                     if (reconsumeTimes != null) {
@@ -791,11 +810,15 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                 switch (communicationMode) {
                     case ASYNC:
                         Message tmpMessage = msg;
+                        //如果消息被压缩过，msgbody为原来的消息
+                        // 否则如果这个消息是发送失败的，并且消息体依然大于压缩阈值，被压缩了俩次。
+                        // 所以tmpMessage从msgclone了新对象，原Message不变，如果失败了可以通过原message进行重发
                         if (msgBodyCompressed) {
                             //If msg body was compressed, msgbody should be reset using prevBody.
                             //Clone new message using commpressed message body and recover origin massage.
                             //Fix bug:https://github.com/apache/rocketmq-externals/issues/66
                             tmpMessage = MessageAccessor.cloneMessage(msg);
+                            //todo FIXME?? 这一步是否有必要要，因为有finnaly
                             msg.setBody(prevBody);
                         }
                         long costTimeAsync = System.currentTimeMillis() - beginStartTime;
@@ -837,6 +860,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                         break;
                 }
 
+                //执行hook
                 if (this.hasSendMessageHook()) {
                     context.setSendResult(sendResult);
                     this.executeSendMessageHookAfter(context);
@@ -862,6 +886,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                 }
                 throw e;
             } finally {
+                //因为msg.body已经被压缩过了，所以需要重置body
                 msg.setBody(prevBody);
             }
         }
@@ -880,6 +905,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         }
         byte[] body = msg.getBody();
         if (body != null) {
+            //消息体大于4k,进行压缩
             if (body.length >= this.defaultMQProducer.getCompressMsgBodyOverHowmuch()) {
                 try {
                     byte[] data = UtilAll.compress(body, zipCompressLevel);

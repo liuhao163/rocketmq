@@ -72,7 +72,7 @@ public class RemotingCommand {
     private int code;
     private LanguageCode language = LanguageCode.JAVA;
     private int version = 0;
-    private int opaque = requestId.getAndIncrement();
+    private int opaque = requestId.getAndIncrement();//每个请求自增
     private int flag = 0;
     private String remark;
     private HashMap<String, String> extFields;

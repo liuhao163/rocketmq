@@ -265,8 +265,10 @@ public abstract class NettyRemotingAbstract {
             responseTable.remove(opaque);
 
             if (responseFuture.getInvokeCallback() != null) {
+                //异步处理executeInvokeCallback
                 executeInvokeCallback(responseFuture);
             } else {
+                //同步处理executeInvokeCallback，结束wait
                 responseFuture.putResponse(cmd);
                 responseFuture.release();
             }
@@ -380,11 +382,16 @@ public abstract class NettyRemotingAbstract {
 
                     responseTable.remove(opaque);
                     responseFuture.setCause(f.cause());
+                    //发送消息成功到了通知responseFuture
                     responseFuture.putResponse(null);
                     log.warn("send a request command to channel <" + addr + "> failed.");
                 }
             });
 
+            //async是直接交给processResponseCommand就返回了,这里是同步转异步等待一定时间
+            // 1.在processResponseCommand可以主动终止，发送ok
+            // 2.ChannelFutureListener失败，可以主动终止，失败
+            // 3.超时
             RemotingCommand responseCommand = responseFuture.waitResponse(timeoutMillis);
             if (null == responseCommand) {
                 if (responseFuture.isSendRequestOK()) {
@@ -406,6 +413,8 @@ public abstract class NettyRemotingAbstract {
         throws InterruptedException, RemotingTooMuchRequestException, RemotingTimeoutException, RemotingSendRequestException {
         long beginStartTime = System.currentTimeMillis();
         final int opaque = request.getOpaque();
+
+        //限流
         boolean acquired = this.semaphoreAsync.tryAcquire(timeoutMillis, TimeUnit.MILLISECONDS);
         if (acquired) {
             final SemaphoreReleaseOnlyOnce once = new SemaphoreReleaseOnlyOnce(this.semaphoreAsync);
@@ -414,7 +423,14 @@ public abstract class NettyRemotingAbstract {
                 throw new RemotingTooMuchRequestException("invokeAsyncImpl call timeout");
             }
 
+            //responseFuture每个请求创建一个responseFuture，在responseFuture调用invokeCallback
             final ResponseFuture responseFuture = new ResponseFuture(channel, opaque, timeoutMillis - costTime, invokeCallback, once);
+            /**
+             * 标准的rpc异步处理流程
+             * 1.这里是讲requestId-->responseFuture放到responseTable
+             * 2.当server处理完发送请求之后发送回客户端由processResponseCommand方法处理，responseTable通过repsonse的Id,取到对应的responseFuture
+             * 3.invokeCallback来处理后续操作
+             */
             this.responseTable.put(opaque, responseFuture);
             try {
                 channel.writeAndFlush(request).addListener(new ChannelFutureListener() {
@@ -424,6 +440,7 @@ public abstract class NettyRemotingAbstract {
                             responseFuture.setSendRequestOK(true);
                             return;
                         }
+                        //处理失败的请求
                         requestFail(opaque);
                         log.warn("send a request command to channel <{}> failed.", RemotingHelper.parseChannelRemoteAddr(channel));
                     }
@@ -484,6 +501,7 @@ public abstract class NettyRemotingAbstract {
     public void invokeOnewayImpl(final Channel channel, final RemotingCommand request, final long timeoutMillis)
         throws InterruptedException, RemotingTooMuchRequestException, RemotingTimeoutException, RemotingSendRequestException {
         request.markOnewayRPC();
+        //限流
         boolean acquired = this.semaphoreOneway.tryAcquire(timeoutMillis, TimeUnit.MILLISECONDS);
         if (acquired) {
             final SemaphoreReleaseOnlyOnce once = new SemaphoreReleaseOnlyOnce(this.semaphoreOneway);
@@ -491,6 +509,7 @@ public abstract class NettyRemotingAbstract {
                 channel.writeAndFlush(request).addListener(new ChannelFutureListener() {
                     @Override
                     public void operationComplete(ChannelFuture f) throws Exception {
+                        //释放
                         once.release();
                         if (!f.isSuccess()) {
                             log.warn("send a request command to channel <" + channel.remoteAddress() + "> failed.");

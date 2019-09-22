@@ -115,6 +115,7 @@ public class RouteInfoManager {
             try {
                 this.lock.writeLock().lockInterruptibly();
 
+                //更新Cluster-->brokerNames
                 Set<String> brokerNames = this.clusterAddrTable.get(clusterName);
                 if (null == brokerNames) {
                     brokerNames = new HashSet<String>();
@@ -124,6 +125,8 @@ public class RouteInfoManager {
 
                 boolean registerFirst = false;
 
+                //更新brokerAddrTable（brokerName-->brokerData）
+                //取得brokerData并且在brokerAddrsput brokerId->addr
                 BrokerData brokerData = this.brokerAddrTable.get(brokerName);
                 if (null == brokerData) {
                     registerFirst = true;
@@ -133,6 +136,7 @@ public class RouteInfoManager {
                 String oldAddr = brokerData.getBrokerAddrs().put(brokerId, brokerAddr);
                 registerFirst = registerFirst || (null == oldAddr);
 
+                //Broker是Master，发生变化或者是第一次注册，更新QueueData
                 if (null != topicConfigWrapper
                         && MixAll.MASTER_ID == brokerId) {
                     if (this.isBrokerTopicConfigChanged(brokerAddr, topicConfigWrapper.getDataVersion())
