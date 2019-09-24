@@ -603,6 +603,7 @@ public class MQClientInstance {
                     //获取路由信息
                     TopicRouteData topicRouteData;
                     if (isDefault && defaultMQProducer != null) {
+                        //发送RequestCode为GET_ROUTEINTO_BY_TOPIC的请求获取topicRouteData
                         topicRouteData = this.mQClientAPIImpl.getDefaultTopicRouteInfoFromNameServer(defaultMQProducer.getCreateTopicKey(),
                                 1000 * 3);
                         if (topicRouteData != null) {
