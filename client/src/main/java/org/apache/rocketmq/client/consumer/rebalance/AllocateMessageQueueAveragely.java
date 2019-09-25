@@ -16,12 +16,13 @@
  */
 package org.apache.rocketmq.client.consumer.rebalance;
 
-import java.util.ArrayList;
-import java.util.List;
 import org.apache.rocketmq.client.consumer.AllocateMessageQueueStrategy;
 import org.apache.rocketmq.client.log.ClientLogger;
-import org.apache.rocketmq.logging.InternalLogger;
 import org.apache.rocketmq.common.message.MessageQueue;
+import org.apache.rocketmq.logging.InternalLogger;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Average Hashing queue algorithm
@@ -77,26 +78,4 @@ public class AllocateMessageQueueAveragely implements AllocateMessageQueueStrate
         return "AVG";
     }
 
-    public static void main(String[] args) {
-        int index=2;
-        int mqSize=10;
-        int cId=7;
-        int mod=mqSize%cId;
-
-        int averageSize =
-                mqSize <= cId ? 1 : (mod > 0 && index < mod ? mqSize/ cId
-                        + 1 : mqSize / cId);
-        System.out.println(averageSize);
-        int startIndex = (mod > 0 && index < mod) ? index * averageSize : index * averageSize + mod;
-        System.out.println(startIndex);
-
-        int range = Math.min(averageSize, mqSize - startIndex);
-        System.out.println(range);
-
-        System.out.println("=====");
-        for (int i = 0; i < range; i++) {
-            System.out.println((startIndex + i) % mqSize);
-        }
-
-    }
 }
