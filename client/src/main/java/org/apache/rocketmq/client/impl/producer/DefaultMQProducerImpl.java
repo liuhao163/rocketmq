@@ -503,6 +503,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
     /**
      * 默认不用指定mq以及不需要通过mqSelector方法的实现，实现上最后调用sendKernelImpl
      * selectQueue采用了
+     *
      * @param msg               消息
      * @param communicationMode SYNC ASYNC ONEWAY
      * @param sendCallback      ASYNC模式时候的作用
@@ -1101,10 +1102,12 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         this.makeSureStateOK();
         Validators.checkMessage(msg, this.defaultMQProducer);
 
+        //获取topicPublishInfo
         TopicPublishInfo topicPublishInfo = this.tryToFindTopicPublishInfo(msg.getTopic());
         if (topicPublishInfo != null && topicPublishInfo.ok()) {
             MessageQueue mq = null;
             try {
+                //用自定义的selector，从getMessageQueueList选择一个队列
                 mq = selector.select(topicPublishInfo.getMessageQueueList(), msg, arg);
             } catch (Throwable e) {
                 throw new MQClientException("select message queue throwed exception.", e);
@@ -1115,6 +1118,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
                 throw new RemotingTooMuchRequestException("sendSelectImpl call timeout");
             }
             if (mq != null) {
+                //发送消息
                 return this.sendKernelImpl(msg, mq, communicationMode, sendCallback, null, timeout - costTime);
             } else {
                 throw new MQClientException("select message queue return null.", null);
