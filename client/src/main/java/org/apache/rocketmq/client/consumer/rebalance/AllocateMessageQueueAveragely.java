@@ -56,16 +56,19 @@ public class AllocateMessageQueueAveragely implements AllocateMessageQueueStrate
         int index = cidAll.indexOf(currentCID);
         //mod代表多出来的队列数
         int mod = mqAll.size() % cidAll.size();
-        //averageSize 奇数
-        // mqAll.size() <= cidAll.size() 消费者数量超过了Mq队列永远返回1
-        // mod>0 && index < mod，说明：不能整除，index小于mod说明有富裕的mq可分配mqAll.size() / cidAll.size()+1，否则mqAll.size() / cidAll.size()
+        //averageSize 每个消费者对应的队列数
+        // mqAll.size() <= cidAll.size() 消费者数量超过了mq队列，每个消费者消费1个队列
+        // mod>0 && index < mod，说明：不能整除而且该消费者对应的队列数量是mqSize/cosumerSize+1即多出来一个，否则的是花是mqSize/cosumerSize
         int averageSize =
             mqAll.size() <= cidAll.size() ? 1 : (mod > 0 && index < mod ? mqAll.size() / cidAll.size()
                 + 1 : mqAll.size() / cidAll.size());
 
-        //startIndex：
-        //不能整除：并且有富裕的多出来的，index*avarageSize
+        //startIndex，该消费者对应的队列下标
+        //mod > 0 && index < mod，不能整除，而且消费者对应的队列数量是多余出来的，则开始的下标是index*avarageSize
+        //反之，消费者对应的队列数量不能多余出一个，index*avarageSize+mod ,这里注意avarageSize是比上面-1的（超过mod的下标，index*averageSize）
         int startIndex = (mod > 0 && index < mod) ? index * averageSize : index * averageSize + mod;
+
+        //队列的数量是averageSize，和注意如果消费者大于mq且index>mode，这里会出现负数，也就是说多的消费者没有数据
         int range = Math.min(averageSize, mqAll.size() - startIndex);
         for (int i = 0; i < range; i++) {
             result.add(mqAll.get((startIndex + i) % mqAll.size()));
