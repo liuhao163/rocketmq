@@ -986,6 +986,7 @@ public class MQClientInstance {
         return this.consumerTable.get(group);
     }
 
+    //内存中取第一个broker
     public FindBrokerResult findBrokerAddressInAdmin(final String brokerName) {
         String brokerAddr = null;
         boolean slave = false;

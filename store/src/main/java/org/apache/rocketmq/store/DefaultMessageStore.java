@@ -617,8 +617,10 @@ public class DefaultMessageStore implements MessageStore {
     }
 
     public long getMinOffsetInQueue(String topic, int queueId) {
+        //getAndCreateQueue
         ConsumeQueue logic = this.findConsumeQueue(topic, queueId);
         if (logic != null) {
+            //找到队列里最小的offsetminLogicOffset / CQ_STORE_UNIT_SIZE
             return logic.getMinOffsetInQueue();
         }
 
@@ -1016,9 +1018,11 @@ public class DefaultMessageStore implements MessageStore {
         return messageIds;
     }
 
+    //todo ???
     @Override
     public boolean checkInDiskByConsumeOffset(final String topic, final int queueId, long consumeOffset) {
 
+        //当前commitLog最大的偏移量
         final long maxOffsetPy = this.commitLog.getMaxOffset();
 
         ConsumeQueue consumeQueue = findConsumeQueue(topic, queueId);
@@ -1082,6 +1086,7 @@ public class DefaultMessageStore implements MessageStore {
     public ConsumeQueue findConsumeQueue(String topic, int queueId) {
         ConcurrentMap<Integer, ConsumeQueue> map = consumeQueueTable.get(topic);
         if (null == map) {
+            //防止并发
             ConcurrentMap<Integer, ConsumeQueue> newMap = new ConcurrentHashMap<Integer, ConsumeQueue>(128);
             ConcurrentMap<Integer, ConsumeQueue> oldMap = consumeQueueTable.putIfAbsent(topic, newMap);
             if (oldMap != null) {
@@ -1093,12 +1098,15 @@ public class DefaultMessageStore implements MessageStore {
 
         ConsumeQueue logic = map.get(queueId);
         if (null == logic) {
+
             ConsumeQueue newLogic = new ConsumeQueue(
                     topic,
                     queueId,
                     StorePathConfigHelper.getStorePathConsumeQueue(this.messageStoreConfig.getStorePathRootDir()),
                     this.getMessageStoreConfig().getMapedFileSizeConsumeQueue(),
                     this);
+
+            //防止并发
             ConsumeQueue oldLogic = map.putIfAbsent(queueId, newLogic);
             if (oldLogic != null) {
                 logic = oldLogic;

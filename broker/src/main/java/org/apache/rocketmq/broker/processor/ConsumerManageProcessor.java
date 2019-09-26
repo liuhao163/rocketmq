@@ -117,26 +117,33 @@ public class ConsumerManageProcessor implements NettyRequestProcessor {
 
     private RemotingCommand queryConsumerOffset(ChannelHandlerContext ctx, RemotingCommand request)
         throws RemotingCommandException {
+        //创建响应
         final RemotingCommand response =
             RemotingCommand.createResponseCommand(QueryConsumerOffsetResponseHeader.class);
+        //响应头
         final QueryConsumerOffsetResponseHeader responseHeader =
             (QueryConsumerOffsetResponseHeader) response.readCustomHeader();
+        //请求头
         final QueryConsumerOffsetRequestHeader requestHeader =
             (QueryConsumerOffsetRequestHeader) request
                 .decodeCommandCustomHeader(QueryConsumerOffsetRequestHeader.class);
 
+        //从内存中查询offset key是topic@consumer 在通过queueId取
         long offset =
             this.brokerController.getConsumerOffsetManager().queryOffset(
                 requestHeader.getConsumerGroup(), requestHeader.getTopic(), requestHeader.getQueueId());
 
+        //如果>=0
         if (offset >= 0) {
             responseHeader.setOffset(offset);
             response.setCode(ResponseCode.SUCCESS);
             response.setRemark(null);
         } else {
+            //通过MessageStore获取队列中最小的OffSet
             long minOffset =
                 this.brokerController.getMessageStore().getMinOffsetInQueue(requestHeader.getTopic(),
                     requestHeader.getQueueId());
+            //如果小于等于0，并且检验磁盘的minOffset
             if (minOffset <= 0
                 && !this.brokerController.getMessageStore().checkInDiskByConsumeOffset(
                 requestHeader.getTopic(), requestHeader.getQueueId(), 0)) {
@@ -144,6 +151,7 @@ public class ConsumerManageProcessor implements NettyRequestProcessor {
                 response.setCode(ResponseCode.SUCCESS);
                 response.setRemark(null);
             } else {
+                //错误
                 response.setCode(ResponseCode.QUERY_NOT_FOUND);
                 response.setRemark("Not found, V3_0_6_SNAPSHOT maybe this group consumer boot first");
             }
