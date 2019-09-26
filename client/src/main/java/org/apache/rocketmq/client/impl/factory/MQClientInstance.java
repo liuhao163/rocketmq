@@ -237,16 +237,16 @@ public class MQClientInstance {
                     this.serviceState = ServiceState.START_FAILED;
                     // If not specified,looking address from name server
                     if (null == this.clientConfig.getNamesrvAddr()) {
-                        //感觉是服务发现
+                        //感觉是通过远程接口获取nameAddr
                         this.mQClientAPIImpl.fetchNameServerAddr();
                     }
                     // Start request-response channel 处理rocktmq的coumser相关的系统事件和CONSUME_MESSAGE_DIRECTLY等信息
                     this.mQClientAPIImpl.start();
                     // Start various schedule tasks 服务发现的任务保证服务的发现
                     this.startScheduledTask();
-                    // Start pull service  启动pullMessageService通过queue拉取线程
+                    // Start pull service  启动pullMessageService通过queue拉取线程，消费者特有
                     this.pullMessageService.start();
-                    // Start rebalance service 每隔一段时间执行一次doReblance方法
+                    // Start rebalance service 每隔一段时间执行一次doReblance方法,消费者特有
                     this.rebalanceService.start();
                     // Start push service 启动push服务
                     this.defaultMQProducer.getDefaultMQProducerImpl().start(false);
