@@ -583,7 +583,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                     this.defaultMQPushConsumer.getConsumerGroup(), isUnitMode());
                 this.pullAPIWrapper.registerFilterMessageHook(filterMessageHookList);
 
-                //初始化OffsetStore todo 重点看
+                //初始化OffsetStore
                 if (this.defaultMQPushConsumer.getOffsetStore() != null) {
                     this.offsetStore = this.defaultMQPushConsumer.getOffsetStore();
                 } else {
@@ -614,7 +614,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                 }
                 this.consumeMessageService.start();
 
-                //注册消费者 todo 重点看
+                //注册消费者放到内存中
                 boolean registerOK = mQClientFactory.registerConsumer(this.defaultMQPushConsumer.getConsumerGroup(), this);
                 if (!registerOK) {
                     this.serviceState = ServiceState.CREATE_JUST;

@@ -126,7 +126,7 @@ public class BrokerOuterAPI {
         final List<RegisterBrokerResult> registerBrokerResultList = Lists.newArrayList();
         List<String> nameServerAddressList = this.remotingClient.getNameServerAddressList();
         if (nameServerAddressList != null && nameServerAddressList.size() > 0) {
-
+            //关键向nameServer发送RegisterBrokerRequestHeader请求
             final RegisterBrokerRequestHeader requestHeader = new RegisterBrokerRequestHeader();
             requestHeader.setBrokerAddr(brokerAddr);
             requestHeader.setBrokerId(brokerId);
@@ -147,7 +147,9 @@ public class BrokerOuterAPI {
                     @Override
                     public void run() {
                         try {
+                            //封装发送逻辑
                             RegisterBrokerResult result = registerBroker(namesrvAddr,oneway, timeoutMills,requestHeader,body);
+                            //更新注册结果
                             if (result != null) {
                                 registerBrokerResultList.add(result);
                             }
