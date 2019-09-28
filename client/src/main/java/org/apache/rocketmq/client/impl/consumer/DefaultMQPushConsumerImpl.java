@@ -650,7 +650,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         //去broker校验Consumer状态，包括consumer的substring的有孝心等
         this.mQClientFactory.checkClientInBroker();
         //给所有的Broker发送心跳包(code是HEART_BEAT)，包括遍历每个消费者生成Consumer信息包括，消费这的类型、消息模式、FromWhere、订阅信息等,
-        // broker完成消费者的注册等工作-- TODO broker逻辑具体待看
+        // broker完成消费者的注册等工作
         this.mQClientFactory.sendHeartbeatToAllBrokerWithLock();
         // todo 待看
         this.mQClientFactory.rebalanceImmediately();
