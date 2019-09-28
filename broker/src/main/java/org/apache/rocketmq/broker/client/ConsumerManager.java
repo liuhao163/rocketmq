@@ -38,6 +38,7 @@ import org.apache.rocketmq.remoting.common.RemotingUtil;
 public class ConsumerManager {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private static final long CHANNEL_EXPIRED_TIMEOUT = 1000 * 120;
+    //消费组group-->ConsumerGroupInfo
     private final ConcurrentMap<String/* Group */, ConsumerGroupInfo> consumerTable =
             new ConcurrentHashMap<String, ConsumerGroupInfo>(1024);
     private final ConsumerIdsChangeListener consumerIdsChangeListener;
@@ -97,11 +98,22 @@ public class ConsumerManager {
         }
     }
 
-    //todo 重点 待看
+    /**
+     * 注册消费者
+     *
+     * @param group                            消费组
+     * @param clientChannelInfo                客户端链接的信息
+     * @param consumeType                      消费类型 push or pull
+     * @param messageModel                     消息类型
+     * @param consumeFromWhere                 fromWhere
+     * @param subList                          订阅关系的列表，每个consumer的RebalanceImpl#subscriptionInner在注册时候put进去的信息
+     * @param isNotifyConsumerIdsChangedEnable 是否通知客户端的开关
+     * @return
+     */
     public boolean registerConsumer(final String group, final ClientChannelInfo clientChannelInfo,
                                     ConsumeType consumeType, MessageModel messageModel, ConsumeFromWhere consumeFromWhere,
                                     final Set<SubscriptionData> subList, boolean isNotifyConsumerIdsChangedEnable) {
-
+        //get or create ConsumerGroupInfo
         ConsumerGroupInfo consumerGroupInfo = this.consumerTable.get(group);
         if (null == consumerGroupInfo) {
             ConsumerGroupInfo tmp = new ConsumerGroupInfo(group, consumeType, messageModel, consumeFromWhere);
@@ -109,17 +121,22 @@ public class ConsumerManager {
             consumerGroupInfo = prev != null ? prev : tmp;
         }
 
+        //更新clientChannelInfo
         boolean r1 =
                 consumerGroupInfo.updateChannel(clientChannelInfo, consumeType, messageModel,
                         consumeFromWhere);
+
+        //更新SubscriptionData，将remote的更新到本地，并且清理掉已经不存在的SubscriptionData
         boolean r2 = consumerGroupInfo.updateSubscription(subList);
 
         if (r1 || r2) {
             if (isNotifyConsumerIdsChangedEnable) {
+                //通知所有的消费者，该group订阅关系发送变化 发送NOTIFY_CONSUMER_IDS_CHANGED事件，所有该group下的consumer会立刻做doBalance操作
                 this.consumerIdsChangeListener.handle(ConsumerGroupEvent.CHANGE, group, consumerGroupInfo.getAllChannel());
             }
         }
 
+        //consumerIdsChangeListener处理注册事件，调用getConsumerFilterManager().register todo mark 待看
         this.consumerIdsChangeListener.handle(ConsumerGroupEvent.REGISTER, group, subList);
 
         return r1 || r2;

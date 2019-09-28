@@ -56,6 +56,7 @@ public class DefaultConsumerIdsChangeListener implements ConsumerIdsChangeListen
                     return;
                 }
                 Collection<SubscriptionData> subscriptionDataList = (Collection<SubscriptionData>) args[0];
+                //todo 注册ConsumerFilterData里面好像用到了bloomfilter
                 this.brokerController.getConsumerFilterManager().register(group, subscriptionDataList);
                 break;
             default:

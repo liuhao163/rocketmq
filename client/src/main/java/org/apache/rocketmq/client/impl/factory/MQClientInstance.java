@@ -554,6 +554,7 @@ public class MQClientInstance {
                         Long id = entry1.getKey();
                         String addr = entry1.getValue();
                         if (addr != null) {
+                            //生产者只给Master发送心跳
                             if (consumerEmpty) {
                                 if (id != MixAll.MASTER_ID)
                                     continue;

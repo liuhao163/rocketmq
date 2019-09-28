@@ -244,7 +244,7 @@ public class TopicConfigManager extends ConfigManager {
                     this.topicConfigTable.put(topic, topicConfig);
                     createNew = true;
                     this.dataVersion.nextVersion();
-                    this.persist();
+                    this.persist();//持久化
                 } finally {
                     this.lockTopicConfigTable.unlock();
                 }
@@ -253,6 +253,7 @@ public class TopicConfigManager extends ConfigManager {
             log.error("createTopicInSendMessageBackMethod exception", e);
         }
 
+        //因为已经persist，所以将刚才创建的的topic通过registerBrokerAll方式通知给其他的Borker
         if (createNew) {
             this.brokerController.registerBrokerAll(false, true,true);
         }

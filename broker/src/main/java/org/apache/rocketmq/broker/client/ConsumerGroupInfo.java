@@ -35,8 +35,10 @@ import org.apache.rocketmq.common.protocol.heartbeat.SubscriptionData;
 public class ConsumerGroupInfo {
     private static final InternalLogger log = InternalLoggerFactory.getLogger(LoggerName.BROKER_LOGGER_NAME);
     private final String groupName;
+    //一个消费组可以对应多个topic
     private final ConcurrentMap<String/* Topic */, SubscriptionData> subscriptionTable =
         new ConcurrentHashMap<String, SubscriptionData>();
+    //消费组的链接关系
     private final ConcurrentMap<Channel, ClientChannelInfo> channelInfoTable =
         new ConcurrentHashMap<Channel, ClientChannelInfo>(16);
     private volatile ConsumeType consumeType;
@@ -122,6 +124,7 @@ public class ConsumerGroupInfo {
 
         ClientChannelInfo infoOld = this.channelInfoTable.get(infoNew.getChannel());
         if (null == infoOld) {
+            //为空第一次set todo 这里是个bug，应该是putIfAbsent
             ClientChannelInfo prev = this.channelInfoTable.put(infoNew.getChannel(), infoNew);
             if (null == prev) {
                 log.info("new consumer connected, group: {} {} {} channel: {}", this.groupName, consumeType,
@@ -131,6 +134,7 @@ public class ConsumerGroupInfo {
 
             infoOld = infoNew;
         } else {
+            //clientid 不相等，重新set，但是updated不修改依然是false
             if (!infoOld.getClientId().equals(infoNew.getClientId())) {
                 log.error("[BUG] consumer channel exist in broker, but clientId not equal. GROUP: {} OLD: {} NEW: {} ",
                     this.groupName,
@@ -149,6 +153,7 @@ public class ConsumerGroupInfo {
     public boolean updateSubscription(final Set<SubscriptionData> subList) {
         boolean updated = false;
 
+        //遍历remote的subList
         for (SubscriptionData sub : subList) {
             SubscriptionData old = this.subscriptionTable.get(sub.getTopic());
             if (old == null) {
@@ -160,6 +165,7 @@ public class ConsumerGroupInfo {
                         sub.toString());
                 }
             } else if (sub.getSubVersion() > old.getSubVersion()) {
+                //从consumer传来的版本如果大于本地的版本，同时是push模式的打印log
                 if (this.consumeType == ConsumeType.CONSUME_PASSIVELY) {
                     log.info("subscription changed, group: {} OLD: {} NEW: {}",
                         this.groupName,
@@ -172,6 +178,7 @@ public class ConsumerGroupInfo {
             }
         }
 
+        //遍历Local和remote的比较，清理掉已经过期的SubscriptionData
         Iterator<Entry<String, SubscriptionData>> it = this.subscriptionTable.entrySet().iterator();
         while (it.hasNext()) {
             Entry<String, SubscriptionData> next = it.next();

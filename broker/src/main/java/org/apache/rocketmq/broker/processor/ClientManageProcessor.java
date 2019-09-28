@@ -81,7 +81,7 @@ public class ClientManageProcessor implements NettyRequestProcessor {
             request.getVersion()
         );
 
-        //consumer
+        //consumer 遍历心跳包中的CounsumerData信息（来源于ConsumerTable）
         for (ConsumerData data : heartbeatData.getConsumerDataSet()) {
             SubscriptionGroupConfig subscriptionGroupConfig =
                 this.brokerController.getSubscriptionGroupManager().findSubscriptionGroupConfig(
@@ -93,14 +93,16 @@ public class ClientManageProcessor implements NettyRequestProcessor {
                 if (data.isUnitMode()) {
                     topicSysFlag = TopicSysFlag.buildSysFlag(false, true);
                 }
+
+                //创建RetryTopic %RETRY%ConsumerGroup
                 String newTopic = MixAll.getRetryTopic(data.getGroupName());
                 this.brokerController.getTopicConfigManager().createTopicInSendMessageBackMethod(
                     newTopic,
-                    subscriptionGroupConfig.getRetryQueueNums(),
+                    subscriptionGroupConfig.getRetryQueueNums(),//默认是1
                     PermName.PERM_WRITE | PermName.PERM_READ, topicSysFlag);
             }
 
-            //broker注册消费者
+            //broker通过consumerManager注册消费者
             boolean changed = this.brokerController.getConsumerManager().registerConsumer(
                 data.getGroupName(),
                 clientChannelInfo,
