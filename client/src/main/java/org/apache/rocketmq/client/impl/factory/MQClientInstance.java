@@ -145,6 +145,7 @@ public class MQClientInstance {
         //拉取Message
         this.pullMessageService = new PullMessageService(this);
 
+        //create RebalanceService
         this.rebalanceService = new RebalanceService(this);
 
         //内部生产者topic，用于消费失败或超时的消息，sendMessageBack回发给broker，放大retry topic中重试消费
