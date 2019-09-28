@@ -147,6 +147,7 @@ public class MQClientInstance {
 
         this.rebalanceService = new RebalanceService(this);
 
+        //内部生产者topic，用于消费失败或超时的消息，sendMessageBack回发给broker，放大retry topic中重试消费
         this.defaultMQProducer = new DefaultMQProducer(MixAll.CLIENT_INNER_PRODUCER_GROUP);
         this.defaultMQProducer.resetClientConfig(clientConfig);
 
@@ -214,12 +215,20 @@ public class MQClientInstance {
         return info;
     }
 
+    /**
+     * 遍历QueueData，每个包含Master的BrokerData对应一个QueueData，生成MessageQueueSet
+     * @param topic
+     * @param route
+     * @return
+     */
     public static Set<MessageQueue> topicRouteData2TopicSubscribeInfo(final String topic, final TopicRouteData route) {
         Set<MessageQueue> mqList = new HashSet<MessageQueue>();
         List<QueueData> qds = route.getQueueDatas();
+
         for (QueueData qd : qds) {
             if (PermName.isReadable(qd.getPerm())) {
                 for (int i = 0; i < qd.getReadQueueNums(); i++) {
+                    //生成消费者的MessageQueue
                     MessageQueue mq = new MessageQueue(topic, qd.getBrokerName(), i);
                     mqList.add(mq);
                 }
@@ -422,13 +431,16 @@ public class MQClientInstance {
     public void checkClientInBroker() throws MQClientException {
         Iterator<Entry<String, MQConsumerInner>> it = this.consumerTable.entrySet().iterator();
 
+        //遍历消费者列表
         while (it.hasNext()) {
             Entry<String, MQConsumerInner> entry = it.next();
+            //如果消费者的SubscriptionData为空直接返回
             Set<SubscriptionData> subscriptionInner = entry.getValue().subscriptions();
             if (subscriptionInner == null || subscriptionInner.isEmpty()) {
                 return;
             }
 
+            //遍历subscriptionInner
             for (SubscriptionData subscriptionData : subscriptionInner) {
                 if (ExpressionType.isTagType(subscriptionData.getExpressionType())) {
                     continue;
@@ -437,6 +449,7 @@ public class MQClientInstance {
                 // assume that the configs of every broker in cluster are the the same.
                 String addr = findBrokerAddrByTopic(subscriptionData.getTopic());
 
+                //给broker发送CHECK_CLIENT_CONFIG校验broker状态,如果不是tag类型要对subString进行语法校验
                 if (addr != null) {
                     try {
                         this.getMQClientAPIImpl().checkClientInBroker(
@@ -650,7 +663,9 @@ public class MQClientInstance {
 
                             // Update sub info
                             {
+                                //遍历QueueData，每个包含Master的BrokerData对应一个QueueData，生成MessageQueueSet
                                 Set<MessageQueue> subscribeInfo = topicRouteData2TopicSubscribeInfo(topic, topicRouteData);
+                                //遍历consumerTable更新subscribeInfo,DefaultMQPushConsumerImpl#start()put进去的
                                 Iterator<Entry<String, MQConsumerInner>> it = this.consumerTable.entrySet().iterator();
                                 while (it.hasNext()) {
                                     Entry<String, MQConsumerInner> entry = it.next();
@@ -660,6 +675,7 @@ public class MQClientInstance {
                                     }
                                 }
                             }
+                            //保存路由信息
                             log.info("topicRouteTable.put. Topic = {}, TopicRouteData[{}]", topic, cloneTopicRouteData);
                             this.topicRouteTable.put(topic, cloneTopicRouteData);
                             return true;
@@ -690,7 +706,7 @@ public class MQClientInstance {
         // clientID
         heartbeatData.setClientID(this.clientId);
 
-        // Consumer
+        // Consumer 遍历每个消费者生成Consumer信息包括，消费这的类型、消息模式、FromWhere、订阅信息等
         for (Map.Entry<String, MQConsumerInner> entry : this.consumerTable.entrySet()) {
             MQConsumerInner impl = entry.getValue();
             if (impl != null) {
@@ -1085,6 +1101,7 @@ public class MQClientInstance {
         return null;
     }
 
+    //因为BrokerData中的设置都是一样的，所以随机选择一个brokerData，然后优先选主，没有的可以去从库里去获取
     public String findBrokerAddrByTopic(final String topic) {
         TopicRouteData topicRouteData = this.topicRouteTable.get(topic);
         if (topicRouteData != null) {

@@ -45,14 +45,22 @@ import org.apache.rocketmq.common.protocol.heartbeat.SubscriptionData;
  */
 public abstract class RebalanceImpl {
     protected static final InternalLogger log = ClientLogger.getLog();
+    //
     protected final ConcurrentMap<MessageQueue, ProcessQueue> processQueueTable = new ConcurrentHashMap<MessageQueue, ProcessQueue>(64);
+
+    //topic-->MessageQueue列表在DefaultMQPushConsumerImpl#updateTopicSubscribeInfo方法来修改
     protected final ConcurrentMap<String/* topic */, Set<MessageQueue>> topicSubscribeInfoTable =
         new ConcurrentHashMap<String, Set<MessageQueue>>();
+    //topic-->SubscriptionData,在DefaultMQPullConsumerImpl#subscriptionAutomatically维护，以及DefaultMQPullConsumerImpl#subscribe维护
     protected final ConcurrentMap<String /* topic */, SubscriptionData> subscriptionInner =
         new ConcurrentHashMap<String, SubscriptionData>();
+    //消费组
     protected String consumerGroup;
+    //消息类型
     protected MessageModel messageModel;
+    //队列选择算法
     protected AllocateMessageQueueStrategy allocateMessageQueueStrategy;
+    //clientInstance
     protected MQClientInstance mQClientFactory;
 
     public RebalanceImpl(String consumerGroup, MessageModel messageModel,

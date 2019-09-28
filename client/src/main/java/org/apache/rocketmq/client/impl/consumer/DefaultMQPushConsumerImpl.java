@@ -617,7 +617,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                 }
                 this.consumeMessageService.start();
 
-                //mqClinetInstance注册消费者到内存中
+                //mqClinetInstance注册消费者到内存中  group->consumer
                 boolean registerOK = mQClientFactory.registerConsumer(this.defaultMQPushConsumer.getConsumerGroup(), this);
                 if (!registerOK) {
                     this.serviceState = ServiceState.CREATE_JUST;
@@ -642,9 +642,17 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                 break;
         }
 
+        /**
+         * 如果订阅关系存在通过ReblanceImpl获取订阅关系rebalanceImpl#getSubscriptionInner,获取订阅关系
+         * 如果订阅关系不为空。通过NameServer获取TopicRouteInfo并且更新rebalanceImpl中的topicSubscribeInfoTable
+         */
         this.updateTopicSubscribeInfoWhenSubscriptionChanged();
+        //去broker校验Consumer状态，包括consumer的substring的有孝心等
         this.mQClientFactory.checkClientInBroker();
+        //给所有的Broker发送心跳包(code是HEART_BEAT)，包括遍历每个消费者生成Consumer信息包括，消费这的类型、消息模式、FromWhere、订阅信息等,
+        // broker完成消费者的注册等工作-- TODO broker逻辑具体待看
         this.mQClientFactory.sendHeartbeatToAllBrokerWithLock();
+        // todo 待看
         this.mQClientFactory.rebalanceImmediately();
     }
 
@@ -860,6 +868,10 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         return messageListenerInner;
     }
 
+    /**
+     * 通过ReblanceImpl获取订阅关系rebalanceImpl#getSubscriptionInner,获取订阅关系
+     * 如果订阅关系不为空。通过NameServer获取TopicRouteInfo并且更新rebalanceImpl中的topicSubscribeInfoTable
+     */
     private void updateTopicSubscribeInfoWhenSubscriptionChanged() {
         Map<String, SubscriptionData> subTable = this.getSubscriptionInner();
         if (subTable != null) {
@@ -1026,6 +1038,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         }
     }
 
+    //更新topic对应的MessageQueue，实际是更新rebalanceImpl的topicSubscribeInfoTable列表
     @Override
     public void updateTopicSubscribeInfo(String topic, Set<MessageQueue> info) {
         Map<String, SubscriptionData> subTable = this.getSubscriptionInner();
