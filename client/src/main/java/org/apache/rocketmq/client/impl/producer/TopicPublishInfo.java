@@ -29,6 +29,7 @@ public class TopicPublishInfo {
 
     //messageQueues
     private List<MessageQueue> messageQueueList = new ArrayList<MessageQueue>();
+    //用于选择队列用
     private volatile ThreadLocalIndex sendWhichQueue = new ThreadLocalIndex();
 
     //nameserver中的topicRouteData
