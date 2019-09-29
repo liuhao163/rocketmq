@@ -653,6 +653,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         // broker完成消费者的注册等工作
         this.mQClientFactory.sendHeartbeatToAllBrokerWithLock();
         // todo 实际上这里是启动了一个mQClientFactory里通过RebalnceSevice定期去rebalance,这里是通过唤醒线程立刻执行，在mqclient中对所有的Group做rebalance
+        // todo 逻辑真饶，但是确实没啥好办法，他用mQClientFactory管理进程所有的producerGroup和consumerGroup，
         // 1.mQClientFactory#rebalanceImmediately唤醒RebalanceService
         // 2.RebalanceService#run调用mQClientFactory#doRebalance
         // 3.mQClientFactory#doRebalance遍历ConsumerTable（上面registerConsumer方法put的consumer），调用DefaultMQPushConsumerImpl#doRebalance
