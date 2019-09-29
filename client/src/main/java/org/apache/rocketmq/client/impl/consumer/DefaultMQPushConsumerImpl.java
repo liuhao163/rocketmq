@@ -652,7 +652,11 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         //给所有的Broker发送心跳包(code是HEART_BEAT)，包括遍历每个消费者生成Consumer信息包括，消费这的类型、消息模式、FromWhere、订阅信息等,
         // broker完成消费者的注册等工作
         this.mQClientFactory.sendHeartbeatToAllBrokerWithLock();
-        // todo 待看
+        // todo 实际上这里是启动了一个mQClientFactory里通过RebalnceSevice定期去rebalance,这里是通过唤醒线程立刻执行，在mqclient中对所有的Group做rebalance
+        // 1.mQClientFactory#rebalanceImmediately唤醒RebalanceService
+        // 2.RebalanceService#run调用mQClientFactory#doRebalance
+        // 3.mQClientFactory#doRebalance遍历ConsumerTable（上面registerConsumer方法put的consumer），调用DefaultMQPushConsumerImpl#doRebalance
+        // 4.DefaultMQPushConsumerImpl#doRebalance调用RebalanceImpl.doRebalance进行遍历
         this.mQClientFactory.rebalanceImmediately();
     }
 
