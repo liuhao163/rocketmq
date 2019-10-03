@@ -130,6 +130,7 @@ public class DefaultMessageStore implements MessageStore {
         this.indexService = new IndexService(this);
         this.haService = new HAService(this);
 
+        //重要，broker将消息更新到consumerQueue并且通知有新消息
         this.reputMessageService = new ReputMessageService();
 
         this.scheduleMessageService = new ScheduleMessageService(this);
@@ -1772,6 +1773,7 @@ public class DefaultMessageStore implements MessageStore {
                         this.reputFromOffset = result.getStartOffset();
 
                         for (int readSize = 0; readSize < result.getSize() && doNext; ) {
+                            // 校验、返回信息的size，生成重放消息重放调度请求
                             DispatchRequest dispatchRequest =
                                     DefaultMessageStore.this.commitLog.checkMessageAndReturnSize(result.getByteBuffer(), false, false);
                             int size = dispatchRequest.getMsgSize();
@@ -1782,6 +1784,7 @@ public class DefaultMessageStore implements MessageStore {
 
                                     if (BrokerRole.SLAVE != DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole()
                                             && DefaultMessageStore.this.brokerConfig.isLongPollingEnable()) {
+                                        //通知有新的消息
                                         DefaultMessageStore.this.messageArrivingListener.arriving(dispatchRequest.getTopic(),
                                                 dispatchRequest.getQueueId(), dispatchRequest.getConsumeQueueOffset() + 1,
                                                 dispatchRequest.getTagsCode(), dispatchRequest.getStoreTimestamp(),
@@ -1832,6 +1835,7 @@ public class DefaultMessageStore implements MessageStore {
 
             while (!this.isStopped()) {
                 try {
+                    //每一毫秒去做一边doReput
                     Thread.sleep(1);
                     this.doReput();
                 } catch (Exception e) {

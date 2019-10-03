@@ -78,7 +78,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
     @Override
     public RemotingCommand processRequest(final ChannelHandlerContext ctx,
         RemotingCommand request) throws RemotingCommandException {
-        return this.processRequest(ctx.channel(), request, true);
+        return  this.processRequest(ctx.channel(), request, true);
     }
 
     @Override
