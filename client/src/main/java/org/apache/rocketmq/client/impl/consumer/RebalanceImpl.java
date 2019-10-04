@@ -340,6 +340,13 @@ public abstract class RebalanceImpl {
         }
     }
 
+    /**
+     * doRebalance更新topic下的QueueTable(MessageQueue, ProcessQueue)
+     * @param topic
+     * @param mqSet
+     * @param isOrder
+     * @return
+     */
     private boolean updateProcessQueueTableInRebalance(final String topic, final Set<MessageQueue> mqSet,
                                                        final boolean isOrder) {
         boolean changed = false;
@@ -349,8 +356,9 @@ public abstract class RebalanceImpl {
             Entry<MessageQueue, ProcessQueue> next = it.next();
             MessageQueue mq = next.getKey();
             ProcessQueue pq = next.getValue();
-
+            //校验
             if (mq.getTopic().equals(topic)) {
+                //去掉过期的mq和pq
                 if (!mqSet.contains(mq)) {
                     pq.setDropped(true);
                     if (this.removeUnnecessaryMessageQueue(mq, pq)) {
@@ -363,6 +371,7 @@ public abstract class RebalanceImpl {
                         case CONSUME_ACTIVELY:
                             break;
                         case CONSUME_PASSIVELY:
+                            //如果是push去掉pull过去的pq mq
                             pq.setDropped(true);
                             if (this.removeUnnecessaryMessageQueue(mq, pq)) {
                                 it.remove();
@@ -391,6 +400,7 @@ public abstract class RebalanceImpl {
                 ProcessQueue pq = new ProcessQueue();
                 long nextOffset = this.computePullFromWhere(mq);
                 if (nextOffset >= 0) {
+                    //防止并发问题，俩个线程同时put
                     ProcessQueue pre = this.processQueueTable.putIfAbsent(mq, pq);
                     if (pre != null) {
                         log.info("doRebalance, {}, mq already exists, {}", consumerGroup, mq);
