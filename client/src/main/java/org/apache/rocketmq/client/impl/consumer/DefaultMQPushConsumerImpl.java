@@ -294,6 +294,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
             @Override
             public void onSuccess(PullResult pullResult) {
                 if (pullResult != null) {
+                    //过滤消息，修改msg的properties,MinOffset和MaxOffset。
                     pullResult = DefaultMQPushConsumerImpl.this.pullAPIWrapper.processPullResult(pullRequest.getMessageQueue(), pullResult,
                             subscriptionData);
 
@@ -303,7 +304,10 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                     switch (pullResult.getPullStatus()) {
                         case FOUND:
                             long prevRequestOffset = pullRequest.getNextOffset();
+
+                            //1.重要设置下一次拉取的offset从result取 todo mark
                             pullRequest.setNextOffset(pullResult.getNextBeginOffset());
+
                             long pullRT = System.currentTimeMillis() - beginTimestamp;
                             DefaultMQPushConsumerImpl.this.getConsumerStatsManager().incPullRT(pullRequest.getConsumerGroup(),
                                     pullRequest.getMessageQueue().getTopic(), pullRT);
@@ -432,7 +436,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                 classFilter // class filter
         );
 
-        //todo 重点:这里从broker拉取消息，拉取结果：pullCallback处理
+        //重点:想broker发送PULL_MESSAGE的请求拉取消息，拉取后将response转成PullResultExt然后经过pullCallback处理拉取结果
         try {
             this.pullAPIWrapper.pullKernelImpl(
                     pullRequest.getMessageQueue(),

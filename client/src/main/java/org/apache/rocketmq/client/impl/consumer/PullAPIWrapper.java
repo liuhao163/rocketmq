@@ -72,15 +72,19 @@ public class PullAPIWrapper {
         PullResultExt pullResultExt = (PullResultExt) pullResult;
 
         this.updatePullFromWhichNode(mq, pullResultExt.getSuggestWhichBrokerId());
+        //判断状态是FOUND有新消息
         if (PullStatus.FOUND == pullResult.getPullStatus()) {
             ByteBuffer byteBuffer = ByteBuffer.wrap(pullResultExt.getMessageBinary());
             List<MessageExt> msgList = MessageDecoder.decodes(byteBuffer);
 
+            //声明msgListFilterAgain，进行msg的过滤
             List<MessageExt> msgListFilterAgain = msgList;
+            //tagSet不为空，过滤方式不是通过ClassFilter
             if (!subscriptionData.getTagsSet().isEmpty() && !subscriptionData.isClassFilterMode()) {
                 msgListFilterAgain = new ArrayList<MessageExt>(msgList.size());
                 for (MessageExt msg : msgList) {
                     if (msg.getTags() != null) {
+                        //包含这些tag的进入到msgListFilterAgain中
                         if (subscriptionData.getTagsSet().contains(msg.getTags())) {
                             msgListFilterAgain.add(msg);
                         }
@@ -95,7 +99,9 @@ public class PullAPIWrapper {
                 this.executeHook(filterMessageContext);
             }
 
+            //设置msg的最小的minOffSet和maxOffSet
             for (MessageExt msg : msgListFilterAgain) {
+                //查看事务类型
                 String traFlag = msg.getProperty(MessageConst.PROPERTY_TRANSACTION_PREPARED);
                 if (traFlag != null && Boolean.parseBoolean(traFlag)) {
                     msg.setTransactionId(msg.getProperty(MessageConst.PROPERTY_UNIQ_CLIENT_MESSAGE_ID_KEYIDX));
@@ -106,6 +112,7 @@ public class PullAPIWrapper {
                     Long.toString(pullResult.getMaxOffset()));
             }
 
+            //设置MsgFoundList
             pullResultExt.setMsgFoundList(msgListFilterAgain);
         }
 
