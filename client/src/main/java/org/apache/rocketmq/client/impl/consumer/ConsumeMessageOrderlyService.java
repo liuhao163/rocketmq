@@ -384,6 +384,10 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
         private final ProcessQueue processQueue;
         private final MessageQueue messageQueue;
 
+        //ConsumeRequest只是面向processQueue和messageQueue的
+        //这里设计的很不错，由于顺序消费针对MessageQueue所以单Queue的消费是线性的
+        //所以：采用了ProcessQueue镜像队列的思路，底层是红黑树，消息按照offset排序然后压进队列。
+        //     ConsumeRequest不停的消费ProcessQueue里弹出来的消息，来提高吞吐
         public ConsumeRequest(ProcessQueue processQueue, MessageQueue messageQueue) {
             this.processQueue = processQueue;
             this.messageQueue = messageQueue;
@@ -411,7 +415,7 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
                 if (MessageModel.BROADCASTING.equals(ConsumeMessageOrderlyService.this.defaultMQPushConsumerImpl.messageModel())
                     || (this.processQueue.isLocked() && !this.processQueue.isLockExpired())) {
                     final long beginTime = System.currentTimeMillis();
-                    //todo 大哥你用个while不行么！！！
+                    //todo 大哥你用个while不行么！！！一直从processQueue中弹出来BatchSize个消息，进行消费知道空为止
                     for (boolean continueConsume = true; continueConsume; ) {
                         //校验如果processQueue失效，break
                         if (this.processQueue.isDropped()) {
@@ -443,7 +447,7 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
                         final int consumeBatchSize =
                             ConsumeMessageOrderlyService.this.defaultMQPushConsumer.getConsumeMessageBatchMaxSize();
 
-                        //从processQueue的红黑树按照顺序take出consumeBatchSize个消息
+                        //重点：从processQueue的红黑树按照顺序take出consumeBatchSize个消息，pullMessage方法会不停的给processQueue压消息
                         List<MessageExt> msgs = this.processQueue.takeMessags(consumeBatchSize);
                         if (!msgs.isEmpty()) {
                             final ConsumeOrderlyContext context = new ConsumeOrderlyContext(this.messageQueue);

@@ -269,7 +269,8 @@ public abstract class RebalanceImpl {
             case CLUSTERING: {
                 //消费者的messageQueue
                 Set<MessageQueue> mqSet = this.topicSubscribeInfoTable.get(topic);
-                //todo 从broker获取consumer信息
+                //从broker获取consumer信息
+                //首次获取会调用updateTopicRouteInfoFromNameServer，更新topicSubscribeInfoTable
                 List<String> cidAll = this.mQClientFactory.findConsumerIdList(topic, consumerGroup);
                 if (null == mqSet) {
                     if (!topic.startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
@@ -309,6 +310,7 @@ public abstract class RebalanceImpl {
                         allocateResultSet.addAll(allocateResult);
                     }
 
+                    //将MessageQueue和processQueue绑定放入processQueueTable
                     boolean changed = this.updateProcessQueueTableInRebalance(topic, allocateResultSet, isOrder);
                     if (changed) {
                         log.info(
@@ -341,9 +343,9 @@ public abstract class RebalanceImpl {
     }
 
     /**
-     * doRebalance更新topic下的QueueTable(MessageQueue, ProcessQueue)
+     * doRebalance更新topic下的QueueTable(MessageQueue, ProcessQueue)，激活pullMessageService
      * @param topic
-     * @param mqSet
+     * @param mqSet cluster模式下的mqSet是经过算法allocat后的结果
      * @param isOrder
      * @return
      */
