@@ -100,10 +100,14 @@ public class MessageDecoder {
      * @param byteBuffer msg commit log buffer.
      */
     public static Map<String, String> decodeProperties(java.nio.ByteBuffer byteBuffer) {
+        //看消息的协议获得topicLength的Pos
+        //消息前缀+int(length)+body
         int topicLengthPosition = BODY_SIZE_POSITION + 4 + byteBuffer.getInt(BODY_SIZE_POSITION);
 
+        //topic长度
         byte topicLength = byteBuffer.get(topicLengthPosition);
 
+        //properties长度
         short propertiesLength = byteBuffer.getShort(topicLengthPosition + 1 + topicLength);
 
         byteBuffer.position(topicLengthPosition + 1 + topicLength + 2);
@@ -132,17 +136,22 @@ public class MessageDecoder {
 
     public static byte[] encode(MessageExt messageExt, boolean needCompress) throws Exception {
         byte[] body = messageExt.getBody();
+
         byte[] topics = messageExt.getTopic().getBytes(CHARSET_UTF8);
         byte topicLen = (byte) topics.length;
+
         String properties = messageProperties2String(messageExt.getProperties());
         byte[] propertiesBytes = properties.getBytes(CHARSET_UTF8);
         short propertiesLength = (short) propertiesBytes.length;
+
         int sysFlag = messageExt.getSysFlag();
+
         byte[] newBody = messageExt.getBody();
         if (needCompress && (sysFlag & MessageSysFlag.COMPRESSED_FLAG) == MessageSysFlag.COMPRESSED_FLAG) {
             newBody = UtilAll.compress(body, 5);
         }
         int bodyLength = newBody.length;
+
         int storeSize = messageExt.getStoreSize();
         ByteBuffer byteBuffer;
         if (storeSize > 0) {

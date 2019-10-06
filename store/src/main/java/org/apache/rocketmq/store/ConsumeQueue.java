@@ -52,7 +52,7 @@ public class ConsumeQueue {
      * @param queueId             queueId
      * @param storePath           storePathRootDir/consumerqueue/topic/queueId
      *                            storePathRootDir/consumerqueu_ext/topic/queueId
-     * @param mappedFileSize      大小是30W消息*每条20字节
+     * @param mappedFileSize      大小是30W消息*每条20字节 每条消息格式如下physical offset(long 8字节)+消息大小size(int 4字节)+tagsCode(long 8字节)
      * @param defaultMessageStore
      */
     public ConsumeQueue(
@@ -498,8 +498,11 @@ public class ConsumeQueue {
         int mappedFileSize = this.mappedFileSize;
         long offset = startIndex * CQ_STORE_UNIT_SIZE;
         if (offset >= this.getMinLogicOffset()) {
+            //通过偏移量找到所在的文件
             MappedFile mappedFile = this.mappedFileQueue.findMappedFileByOffset(offset);
             if (mappedFile != null) {
+                //重点方法 pos=offset % mappedFileSize即当前的偏移量
+                //fileFromOffset+pos，byteBuffer(position:pos,limit:readPosition - pos),size:readPosition - pos,file：this
                 SelectMappedBufferResult result = mappedFile.selectMappedBuffer((int) (offset % mappedFileSize));
                 return result;
             }
