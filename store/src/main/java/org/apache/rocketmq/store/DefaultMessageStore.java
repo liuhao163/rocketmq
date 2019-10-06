@@ -1806,7 +1806,7 @@ public class DefaultMessageStore implements MessageStore {
 
                                     if (BrokerRole.SLAVE != DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole()
                                             && DefaultMessageStore.this.brokerConfig.isLongPollingEnable()) {
-                                        //通知有新的消息
+                                        //broker是Master并且支持长轮序时候，通知有新的消息到了立刻通知挂起的reqeust
                                         DefaultMessageStore.this.messageArrivingListener.arriving(dispatchRequest.getTopic(),
                                                 dispatchRequest.getQueueId(), dispatchRequest.getConsumeQueueOffset() + 1,
                                                 dispatchRequest.getTagsCode(), dispatchRequest.getStoreTimestamp(),
