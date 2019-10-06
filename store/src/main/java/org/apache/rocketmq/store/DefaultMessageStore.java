@@ -1777,6 +1777,7 @@ public class DefaultMessageStore implements MessageStore {
         }
 
         private void doReput() {
+            //doNext and reputFromOffset小于broker的最大的可读的offset即最后一个文件的写活提交的offset
             for (boolean doNext = true; this.isCommitLogAvailable() && doNext; ) {
 
                 if (DefaultMessageStore.this.getMessageStoreConfig().isDuplicationEnable()
@@ -1784,19 +1785,23 @@ public class DefaultMessageStore implements MessageStore {
                     break;
                 }
 
+                //当前commit文件reputFromOffset到ReadPostion的的byteBuffer
                 SelectMappedBufferResult result = DefaultMessageStore.this.commitLog.getData(reputFromOffset);
                 if (result != null) {
                     try {
+                        //更新reputFromOffset
                         this.reputFromOffset = result.getStartOffset();
 
                         for (int readSize = 0; readSize < result.getSize() && doNext; ) {
-                            // 校验、返回信息的size，生成重放消息重放调度请求
+                            // 生成重放消息重放调度请求，-1-失败，0-到文件尾，1-正常
                             DispatchRequest dispatchRequest =
                                     DefaultMessageStore.this.commitLog.checkMessageAndReturnSize(result.getByteBuffer(), false, false);
+
                             int size = dispatchRequest.getMsgSize();
 
                             if (dispatchRequest.isSuccess()) {
                                 if (size > 0) {
+                                    //构建ConsumeQueue
                                     DefaultMessageStore.this.doDispatch(dispatchRequest);
 
                                     if (BrokerRole.SLAVE != DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole()
@@ -1808,6 +1813,7 @@ public class DefaultMessageStore implements MessageStore {
                                                 dispatchRequest.getBitMap(), dispatchRequest.getPropertiesMap());
                                     }
 
+                                    //更新reputFromOffset下次构建从新的地方开始，readSize也增加
                                     this.reputFromOffset += size;
                                     readSize += size;
                                     if (DefaultMessageStore.this.getMessageStoreConfig().getBrokerRole() == BrokerRole.SLAVE) {
@@ -1818,6 +1824,8 @@ public class DefaultMessageStore implements MessageStore {
                                                 .addAndGet(dispatchRequest.getMsgSize());
                                     }
                                 } else if (size == 0) {
+                                    //见checkMessageAndReturnSize有可能遇到(msgLen + END_FILE_MIN_BLANK_LENGTH) > maxBlank)这种情况所以返回0
+                                    //这里reputFromOffset重置并且指定到下个文件
                                     this.reputFromOffset = DefaultMessageStore.this.commitLog.rollNextFile(this.reputFromOffset);
                                     readSize = result.getSize();
                                 }

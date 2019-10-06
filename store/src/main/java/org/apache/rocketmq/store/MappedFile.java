@@ -420,6 +420,7 @@ public class MappedFile extends ReferenceResource {
                 ByteBuffer byteBuffer = this.mappedByteBuffer.slice();
                 byteBuffer.position(pos);
 
+                //当前文件中pos-->readPosition的距离
                 int size = readPosition - pos;
                 ByteBuffer byteBufferNew = byteBuffer.slice();
 
