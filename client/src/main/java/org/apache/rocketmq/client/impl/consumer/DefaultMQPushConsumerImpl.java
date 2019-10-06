@@ -305,7 +305,8 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                         case FOUND:
                             long prevRequestOffset = pullRequest.getNextOffset();
 
-                            //1.重要设置下一次拉取的offset从result取 todo mark
+                            //1.重要设置下一次拉取请求的MessageQueue中的偏移量。（多少条信息）
+                            // 上一次获得的NextBeginOffset详情见broker模块的PullMessageProcessor
                             pullRequest.setNextOffset(pullResult.getNextBeginOffset());
 
                             long pullRT = System.currentTimeMillis() - beginTimestamp;
