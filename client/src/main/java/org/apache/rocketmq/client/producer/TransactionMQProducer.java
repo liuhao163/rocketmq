@@ -26,9 +26,9 @@ public class TransactionMQProducer extends DefaultMQProducer {
     private int checkThreadPoolMinSize = 1;
     private int checkThreadPoolMaxSize = 1;
     private int checkRequestHoldMax = 2000;
-
+    //用于borker回查事务消息用
     private ExecutorService executorService;
-
+    //监听器
     private TransactionListener transactionListener;
 
     public TransactionMQProducer() {
@@ -44,6 +44,7 @@ public class TransactionMQProducer extends DefaultMQProducer {
 
     @Override
     public void start() throws MQClientException {
+        //初始化事务
         this.defaultMQProducerImpl.initTransactionEnv();
         super.start();
     }

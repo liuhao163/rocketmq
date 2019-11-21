@@ -32,8 +32,14 @@ import java.util.concurrent.TimeUnit;
 
 public class TransactionProducer {
     public static void main(String[] args) throws MQClientException, InterruptedException {
+        //事务的监听器，本地事务在这里进行
         TransactionListener transactionListener = new TransactionListenerImpl();
+
+        //生产者采用TransactionMQProducer
         TransactionMQProducer producer = new TransactionMQProducer("please_rename_unique_group_name");
+
+        //处理broker会查本地事务的线程池
+        //producer接到broker发送的RequestCode.CHECK_TRANSACTION_STATE，异步来会差处理本地事务的状态，并且返回给borker
         ExecutorService executorService = new ThreadPoolExecutor(2, 5, 100, TimeUnit.SECONDS, new ArrayBlockingQueue<Runnable>(2000), new ThreadFactory() {
             @Override
             public Thread newThread(Runnable r) {
@@ -42,7 +48,6 @@ public class TransactionProducer {
                 return thread;
             }
         });
-
         producer.setExecutorService(executorService);
         producer.setTransactionListener(transactionListener);
         producer.start();
@@ -53,6 +58,9 @@ public class TransactionProducer {
                 Message msg =
                     new Message("TopicTest1234", tags[i % tags.length], "KEY" + i,
                         ("Hello RocketMQ " + i).getBytes(RemotingHelper.DEFAULT_CHARSET));
+                //send half message给broker
+                //如果sendResult是sendOk会开始执行transactionListener.executeLocalTransaction逻辑,即本地事务。
+                //然后根据localTransactionState发送请求给RequestCode.END_TRANSACTION，broker来选择事务是否完成
                 SendResult sendResult = producer.sendMessageInTransaction(msg, null);
                 System.out.printf("%s%n", sendResult);
 
