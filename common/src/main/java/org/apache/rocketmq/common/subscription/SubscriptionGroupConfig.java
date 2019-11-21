@@ -28,12 +28,14 @@ public class SubscriptionGroupConfig {
 
     private boolean consumeBroadcastEnable = true;
 
+    //重试相关的属性
     private int retryQueueNums = 1;
 
     private int retryMaxTimes = 16;
 
     private long brokerId = MixAll.MASTER_ID;
 
+    //当消费满了选择另一个Broker的ID
     private long whichBrokerWhenConsumeSlowly = 1;
 
     private boolean notifyConsumerIdsChangedEnable = true;

@@ -416,11 +416,17 @@ public class MappedFile extends ReferenceResource {
         int readPosition = getReadPosition();
         if (pos < readPosition && pos >= 0) {
             if (this.hold()) {
+                //从mappedByteBuffer分裂出子buffer，postion设置成pos,在从byteBuffer分裂出byteBufferNew，设置limit是readPosition - pos
                 ByteBuffer byteBuffer = this.mappedByteBuffer.slice();
                 byteBuffer.position(pos);
+
+                //当前文件中pos-->readPosition的距离
                 int size = readPosition - pos;
                 ByteBuffer byteBufferNew = byteBuffer.slice();
+
+                //postition是当前的pos,Limit是readPosition-pos
                 byteBufferNew.limit(size);
+
                 return new SelectMappedBufferResult(this.fileFromOffset + pos, byteBufferNew, size, this);
             }
         }

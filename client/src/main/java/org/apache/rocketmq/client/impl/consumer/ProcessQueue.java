@@ -123,9 +123,15 @@ public class ProcessQueue {
         }
     }
 
+    /**
+     * 将Messages放到红黑树中
+     * @param msgs message信息
+     * @return 如果msgTreeMap不为空，且当前不在消费返回true，为true启动线程开始消费,如果消费中就不在启动线程了防止高并发情况下大量的异步线程将线程池打满
+     */
     public boolean putMessage(final List<MessageExt> msgs) {
         boolean dispatchToConsume = false;
         try {
+            //锁因为msgTreeMap不是线程安全的
             this.lockTreeMap.writeLock().lockInterruptibly();
             try {
                 int validMsgCnt = 0;
@@ -139,6 +145,9 @@ public class ProcessQueue {
                 }
                 msgCount.addAndGet(validMsgCnt);
 
+                //message不为空，并且当前没有consuming.
+                // 因为顺序消费是启动一个线程一直processQueue中弹Message到processQueue为空
+                // 所以当前红黑树不为空，并且不在消费中返回true，起线程开始消费,如果消费中就不在启动线程了防止高并发情况下大量的异步线程将线程池打满
                 if (!msgTreeMap.isEmpty() && !this.consuming) {
                     dispatchToConsume = true;
                     this.consuming = true;
@@ -260,11 +269,15 @@ public class ProcessQueue {
         try {
             this.lockTreeMap.writeLock().lockInterruptibly();
             try {
+                //取到本次消费的最后一个Key
                 Long offset = this.consumingMsgOrderlyTreeMap.lastKey();
+                //更新msgCount的剩余
                 msgCount.addAndGet(0 - this.consumingMsgOrderlyTreeMap.size());
                 for (MessageExt msg : this.consumingMsgOrderlyTreeMap.values()) {
                     msgSize.addAndGet(0 - msg.getBody().length);
                 }
+
+                //清掉本次消费的结果
                 this.consumingMsgOrderlyTreeMap.clear();
                 if (offset != null) {
                     return offset + 1;
@@ -299,14 +312,17 @@ public class ProcessQueue {
         List<MessageExt> result = new ArrayList<MessageExt>(batchSize);
         final long now = System.currentTimeMillis();
         try {
+            //锁
             this.lockTreeMap.writeLock().lockInterruptibly();
             this.lastConsumeTimestamp = now;
             try {
                 if (!this.msgTreeMap.isEmpty()) {
                     for (int i = 0; i < batchSize; i++) {
+                        //按照offset从最小的开始取放入到result中
                         Map.Entry<Long, MessageExt> entry = this.msgTreeMap.pollFirstEntry();
                         if (entry != null) {
                             result.add(entry.getValue());
+                            //放入到当前顺序的消费红黑树中
                             consumingMsgOrderlyTreeMap.put(entry.getKey(), entry.getValue());
                         } else {
                             break;
@@ -314,6 +330,7 @@ public class ProcessQueue {
                     }
                 }
 
+                //如果为空则consuming消费完成
                 if (result.isEmpty()) {
                     consuming = false;
                 }

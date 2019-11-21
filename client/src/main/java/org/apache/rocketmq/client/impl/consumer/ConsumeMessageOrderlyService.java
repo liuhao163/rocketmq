@@ -268,6 +268,7 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
                     log.warn("the message queue consume result is illegal, we think you want to ack these message {}",
                         consumeRequest.getMessageQueue());
                 case SUCCESS:
+                    //提交
                     commitOffset = consumeRequest.getProcessQueue().commit();
                     this.getConsumerStatsManager().incConsumeOKTPS(consumerGroup, consumeRequest.getMessageQueue().getTopic(), msgs.size());
                     break;
@@ -384,6 +385,10 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
         private final ProcessQueue processQueue;
         private final MessageQueue messageQueue;
 
+        //ConsumeRequest只是面向processQueue和messageQueue的
+        //这里设计的很不错，由于顺序消费针对MessageQueue所以单Queue的消费是线性的
+        //所以：采用了ProcessQueue镜像队列的思路，底层是红黑树，消息按照offset排序然后压进队列。
+        //     ConsumeRequest不停的消费ProcessQueue里弹出来的消息，来提高吞吐
         public ConsumeRequest(ProcessQueue processQueue, MessageQueue messageQueue) {
             this.processQueue = processQueue;
             this.messageQueue = messageQueue;
@@ -404,17 +409,22 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
                 return;
             }
 
+            //关键代码锁机制，锁粒度是messageQueue，一个MessageQueue对应一个锁，也就是单一的messageQueue
             final Object objLock = messageQueueLock.fetchLockObject(this.messageQueue);
             synchronized (objLock) {
+
                 if (MessageModel.BROADCASTING.equals(ConsumeMessageOrderlyService.this.defaultMQPushConsumerImpl.messageModel())
                     || (this.processQueue.isLocked() && !this.processQueue.isLockExpired())) {
                     final long beginTime = System.currentTimeMillis();
+                    //todo 大哥你用个while不行么！！！一直从processQueue中弹出来BatchSize个消息，进行消费知道空为止
                     for (boolean continueConsume = true; continueConsume; ) {
+                        //校验如果processQueue失效，break
                         if (this.processQueue.isDropped()) {
                             log.warn("the message queue not be able to consume, because it's dropped. {}", this.messageQueue);
                             break;
                         }
 
+                        //
                         if (MessageModel.CLUSTERING.equals(ConsumeMessageOrderlyService.this.defaultMQPushConsumerImpl.messageModel())
                             && !this.processQueue.isLocked()) {
                             log.warn("the message queue not locked, so consume later, {}", this.messageQueue);
@@ -438,6 +448,7 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
                         final int consumeBatchSize =
                             ConsumeMessageOrderlyService.this.defaultMQPushConsumer.getConsumeMessageBatchMaxSize();
 
+                        //重点：从processQueue的红黑树按照顺序take出consumeBatchSize个消息，pullMessage方法会不停的给processQueue压消息
                         List<MessageExt> msgs = this.processQueue.takeMessags(consumeBatchSize);
                         if (!msgs.isEmpty()) {
                             final ConsumeOrderlyContext context = new ConsumeOrderlyContext(this.messageQueue);
@@ -461,13 +472,15 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
                             ConsumeReturnType returnType = ConsumeReturnType.SUCCESS;
                             boolean hasException = false;
                             try {
+                                //保证线程安全，保证每个消息消费的小城安全
                                 this.processQueue.getLockConsume().lock();
+                                //校验
                                 if (this.processQueue.isDropped()) {
                                     log.warn("consumeMessage, the message queue not be able to consume, because it's dropped. {}",
                                         this.messageQueue);
                                     break;
                                 }
-
+                                //消费逻辑
                                 status = messageListener.consumeMessage(Collections.unmodifiableList(msgs), context);
                             } catch (Throwable e) {
                                 log.warn("consumeMessage exception: {} Group: {} Msgs: {} MQ: {}",
@@ -477,6 +490,7 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
                                     messageQueue);
                                 hasException = true;
                             } finally {
+                                //
                                 this.processQueue.getLockConsume().unlock();
                             }
 

@@ -117,6 +117,7 @@ public class SubscriptionGroupManager extends ConfigManager {
         }
     }
 
+    //查找subscriptionGroupConfig，如果订阅组支持自动创建就创建一个
     public SubscriptionGroupConfig findSubscriptionGroupConfig(final String group) {
         SubscriptionGroupConfig subscriptionGroupConfig = this.subscriptionGroupTable.get(group);
         if (null == subscriptionGroupConfig) {
