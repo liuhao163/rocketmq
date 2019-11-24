@@ -219,6 +219,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
                             || (valueOfCurrentMinusBorn <= -1);
 
                         if (isNeedCheck) {
+                            //给msgExt赋值half-message的msgId等属性。
                             if (!putBackHalfMsgQueue(msgExt, i)) {
                                 continue;
                             }
