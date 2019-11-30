@@ -51,9 +51,11 @@ public class ScheduleMessageService extends ConfigManager {
     private static final long DELAY_FOR_A_WHILE = 100L;
     private static final long DELAY_FOR_A_PERIOD = 10000L;
 
+    //存储根据MessageStoreConfig的配置，level(从0开始)-->millesec（1h--3600000）
     private final ConcurrentMap<Integer /* level */, Long/* delay timeMillis */> delayLevelTable =
         new ConcurrentHashMap<Integer, Long>(32);
 
+    //每个level扫描的偏移量
     private final ConcurrentMap<Integer /* level */, Long/* offset */> offsetTable =
         new ConcurrentHashMap<Integer, Long>(32);
 
@@ -182,15 +184,19 @@ public class ScheduleMessageService extends ConfigManager {
             String[] levelArray = levelString.split(" ");
             for (int i = 0; i < levelArray.length; i++) {
                 String value = levelArray[i];
+                //1h-->ch=h,tu=1000L * 60 * 60
                 String ch = value.substring(value.length() - 1);
                 Long tu = timeUnitTable.get(ch);
 
+                //初始化maxDelayLevel
                 int level = i + 1;
                 if (level > this.maxDelayLevel) {
                     this.maxDelayLevel = level;
                 }
+                //1h-->1
                 long num = Long.parseLong(value.substring(0, value.length() - 1));
                 long delayTimeMillis = tu * num;
+                //put levelIndex,1*1000L * 60 * 60
                 this.delayLevelTable.put(level, delayTimeMillis);
             }
         } catch (Exception e) {
