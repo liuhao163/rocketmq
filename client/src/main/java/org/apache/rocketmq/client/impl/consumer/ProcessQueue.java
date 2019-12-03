@@ -308,6 +308,7 @@ public class ProcessQueue {
         }
     }
 
+    //取消息，msgTreeMap里前batchSize个Message方法consumingMsgOrderlyTreeMap（本次消费的map）中
     public List<MessageExt> takeMessags(final int batchSize) {
         List<MessageExt> result = new ArrayList<MessageExt>(batchSize);
         final long now = System.currentTimeMillis();

@@ -1194,6 +1194,16 @@ public class DefaultMQProducerImpl implements MQProducerInner {
         }
     }
 
+    /**
+     * 1.发送half-message消息sendOk执行本地任务
+     * 2.执行完本地事务通过endTransaction消息通知borker事务结果
+     * 3.封装TransactionSendResult返回
+     * @param msg half message
+     * @param localTransactionExecuter 已经不在需要了传空就好了，5.0.0会用producer的transactionListener替代
+     * @param arg 消息参数
+     * @return TransactionSendResult 返回执行结果
+     * @throws MQClientException 异常
+     */
     public TransactionSendResult sendMessageInTransaction(final Message msg,
                                                           final LocalTransactionExecuter localTransactionExecuter, final Object arg)
             throws MQClientException {

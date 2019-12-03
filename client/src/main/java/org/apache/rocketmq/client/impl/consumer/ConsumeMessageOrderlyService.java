@@ -504,6 +504,7 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
                             }
 
                             long consumeRT = System.currentTimeMillis() - beginTimestamp;
+                            //处理ConsumeOrderlyStatus的返回值转成returnType
                             if (null == status) {
                                 if (hasException) {
                                     returnType = ConsumeReturnType.EXCEPTION;
@@ -536,6 +537,7 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
                             ConsumeMessageOrderlyService.this.getConsumerStatsManager()
                                 .incConsumeRT(ConsumeMessageOrderlyService.this.consumerGroup, messageQueue.getTopic(), consumeRT);
 
+                            //处理消费结果只有success的消息才会从红黑树去掉
                             continueConsume = ConsumeMessageOrderlyService.this.processConsumeResult(msgs, status, context, this);
                         } else {
                             continueConsume = false;
