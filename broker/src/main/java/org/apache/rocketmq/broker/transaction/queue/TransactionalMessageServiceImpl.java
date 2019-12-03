@@ -121,6 +121,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
     public void check(long transactionTimeout, int transactionCheckMax,
         AbstractTransactionalMessageCheckListener listener) {
         try {
+            //Half-message topic
             String topic = MixAll.RMQ_SYS_TRANS_HALF_TOPIC;
             Set<MessageQueue> msgQueues = transactionalMessageBridge.fetchMessageQueues(topic);
             if (msgQueues == null || msgQueues.size() == 0) {
@@ -128,6 +129,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
                 return;
             }
             log.info("Check topic={}, queues={}", topic, msgQueues);
+            //有Half-message,检查如果有消息过期默认是6sec
             for (MessageQueue messageQueue : msgQueues) {
                 long startTime = System.currentTimeMillis();
                 MessageQueue opQueue = getOpQueue(messageQueue);
@@ -217,6 +219,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
                             || (valueOfCurrentMinusBorn <= -1);
 
                         if (isNeedCheck) {
+                            //给msgExt赋值half-message的msgId等属性。
                             if (!putBackHalfMsgQueue(msgExt, i)) {
                                 continue;
                             }
@@ -306,7 +309,7 @@ public class TransactionalMessageServiceImpl implements TransactionalMessageServ
         }
         log.debug("Remove map: {}", removeMap);
         log.debug("Done op list: {}", doneOpOffset);
-        return pullResult;
+            return pullResult;
     }
 
     /**

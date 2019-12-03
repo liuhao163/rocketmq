@@ -1292,6 +1292,7 @@ public class DefaultMQProducerImpl implements MQProducerInner {
             final SendResult sendResult,
             final LocalTransactionState localTransactionState,
             final Throwable localException) throws RemotingException, MQBrokerException, InterruptedException, UnknownHostException {
+        //从Half-message的发送结果，得到MessageId
         final MessageId id;
         if (sendResult.getOffsetMsgId() != null) {
             id = MessageDecoder.decodeMessageId(sendResult.getOffsetMsgId());

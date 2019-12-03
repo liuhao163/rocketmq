@@ -39,9 +39,9 @@ public class EndTransactionRequestHeader implements CommandCustomHeader {
     private Boolean fromTransactionCheck = false;
 
     @CFNotNull
-    private String msgId;
+    private String msgId;//消息的唯一msgId
 
-    private String transactionId;
+    private String transactionId;//事务Id
 
     @Override
     public void checkFields() throws RemotingCommandException {

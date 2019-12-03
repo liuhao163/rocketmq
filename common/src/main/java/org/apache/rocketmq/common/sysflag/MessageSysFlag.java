@@ -36,7 +36,4 @@ public class MessageSysFlag {
         return flag & (~COMPRESSED_FLAG);
     }
 
-    public static void main(String[] args) {
-        System.out.println(TRANSACTION_COMMIT_TYPE);
-    }
 }

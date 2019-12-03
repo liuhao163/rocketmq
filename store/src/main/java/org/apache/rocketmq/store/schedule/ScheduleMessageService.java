@@ -51,9 +51,11 @@ public class ScheduleMessageService extends ConfigManager {
     private static final long DELAY_FOR_A_WHILE = 100L;
     private static final long DELAY_FOR_A_PERIOD = 10000L;
 
+    //存储根据MessageStoreConfig的配置，level(从0开始)-->millesec（1h--3600000）
     private final ConcurrentMap<Integer /* level */, Long/* delay timeMillis */> delayLevelTable =
         new ConcurrentHashMap<Integer, Long>(32);
 
+    //每个level扫描的偏移量
     private final ConcurrentMap<Integer /* level */, Long/* offset */> offsetTable =
         new ConcurrentHashMap<Integer, Long>(32);
 
@@ -102,7 +104,7 @@ public class ScheduleMessageService extends ConfigManager {
     }
 
     public void start() {
-
+        //遍历delayLevelTable，找到每个level的offset,然后异步的启动DeliverDelayedMessageTimerTask去检查
         for (Map.Entry<Integer, Long> entry : this.delayLevelTable.entrySet()) {
             Integer level = entry.getKey();
             Long timeDelay = entry.getValue();
@@ -112,6 +114,7 @@ public class ScheduleMessageService extends ConfigManager {
             }
 
             if (timeDelay != null) {
+                //关键代码，每个level和offset会创建一个DeliverDelayedMessageTimerTask，第一次FIRST_DELAY_TIME（1s后执行）
                 this.timer.schedule(new DeliverDelayedMessageTimerTask(level, offset), FIRST_DELAY_TIME);
             }
         }
@@ -182,15 +185,19 @@ public class ScheduleMessageService extends ConfigManager {
             String[] levelArray = levelString.split(" ");
             for (int i = 0; i < levelArray.length; i++) {
                 String value = levelArray[i];
+                //1h-->ch=h,tu=1000L * 60 * 60
                 String ch = value.substring(value.length() - 1);
                 Long tu = timeUnitTable.get(ch);
 
+                //初始化maxDelayLevel
                 int level = i + 1;
                 if (level > this.maxDelayLevel) {
                     this.maxDelayLevel = level;
                 }
+                //1h-->1
                 long num = Long.parseLong(value.substring(0, value.length() - 1));
                 long delayTimeMillis = tu * num;
+                //put levelIndex,1*1000L * 60 * 60
                 this.delayLevelTable.put(level, delayTimeMillis);
             }
         } catch (Exception e) {
@@ -206,6 +213,11 @@ public class ScheduleMessageService extends ConfigManager {
         private final int delayLevel;
         private final long offset;
 
+        /**
+         * 当前delayLevel和offset
+         * @param delayLevel 延迟等级
+         * @param offset offset
+         */
         public DeliverDelayedMessageTimerTask(int delayLevel, long offset) {
             this.delayLevel = delayLevel;
             this.offset = offset;
@@ -224,6 +236,8 @@ public class ScheduleMessageService extends ConfigManager {
         }
 
         /**
+         * 修正投递时间，如果当前deliverTimestamp>now+delayMills，result就是当前时间，否则就是过期时间
+         * 比如1小时后投递，deliverTimestamp>now+1h，应该立即投递返回now，否则返回deliverTimestamp
          * @return
          */
         private long correctDeliverTimestamp(final long now, final long deliverTimestamp) {
@@ -239,22 +253,25 @@ public class ScheduleMessageService extends ConfigManager {
         }
 
         public void executeOnTimeup() {
+            //根据delayLevel找到制定的consumerQueue
             ConsumeQueue cq =
                 ScheduleMessageService.this.defaultMessageStore.findConsumeQueue(SCHEDULE_TOPIC,
                     delayLevel2QueueId(delayLevel));
 
             long failScheduleOffset = offset;
-
             if (cq != null) {
+                //步骤1，在consumerQueue中根据偏移量找到这条消息的索引信息
                 SelectMappedBufferResult bufferCQ = cq.getIndexBuffer(this.offset);
                 if (bufferCQ != null) {
                     try {
                         long nextOffset = offset;
                         int i = 0;
+                        //获取cqExtUnit
                         ConsumeQueueExt.CqExtUnit cqExtUnit = new ConsumeQueueExt.CqExtUnit();
                         for (; i < bufferCQ.getSize(); i += ConsumeQueue.CQ_STORE_UNIT_SIZE) {
                             long offsetPy = bufferCQ.getByteBuffer().getLong();
                             int sizePy = bufferCQ.getByteBuffer().getInt();
+                            //tagsCode-在conumeQueue持久化时候已经变味了DeliverTimestamp
                             long tagsCode = bufferCQ.getByteBuffer().getLong();
 
                             if (cq.isExtAddr(tagsCode)) {
@@ -269,29 +286,34 @@ public class ScheduleMessageService extends ConfigManager {
                                 }
                             }
 
+                            //步骤2，计算过期时间
                             long now = System.currentTimeMillis();
+                            //修正deliverTimestamp,如果deliverTimestamp>now+delayMills说明过期了
                             long deliverTimestamp = this.correctDeliverTimestamp(now, tagsCode);
 
                             nextOffset = offset + (i / ConsumeQueue.CQ_STORE_UNIT_SIZE);
 
                             long countdown = deliverTimestamp - now;
-
                             if (countdown <= 0) {
+                                //到期了开始投递消息
                                 MessageExt msgExt =
                                     ScheduleMessageService.this.defaultMessageStore.lookMessageByOffset(
                                         offsetPy, sizePy);
 
                                 if (msgExt != null) {
                                     try {
+                                        //修改realTopic，发送消息
                                         MessageExtBrokerInner msgInner = this.messageTimeup(msgExt);
                                         PutMessageResult putMessageResult =
                                             ScheduleMessageService.this.defaultMessageStore
                                                 .putMessage(msgInner);
 
+                                        //发送成功后，继续处理下一条消息
                                         if (putMessageResult != null
                                             && putMessageResult.getPutMessageStatus() == PutMessageStatus.PUT_OK) {
                                             continue;
                                         } else {
+                                            //发送失败，10sec后在开始下一轮扫描
                                             // XXX: warn and notify me
                                             log.error(
                                                 "ScheduleMessageService, a message time up, but reput it failed, topic: {} msgId {}",
@@ -306,9 +328,6 @@ public class ScheduleMessageService extends ConfigManager {
                                     } catch (Exception e) {
                                         /*
                                          * XXX: warn and notify me
-
-
-
                                          */
                                         log.error(
                                             "ScheduleMessageService, messageTimeup execute error, drop it. msgExt="
@@ -317,14 +336,18 @@ public class ScheduleMessageService extends ConfigManager {
                                     }
                                 }
                             } else {
+                                //队列所有消息都扫描结束后，100L后开启下一轮扫描
+                                //由于延期消息是队列，所以相同粒度的延期信息一定是按照顺序写入到队列中的。所以如果当前消息没到发布时间，后面所有消息就都没到发布时间。具体见下面代码
                                 ScheduleMessageService.this.timer.schedule(
                                     new DeliverDelayedMessageTimerTask(this.delayLevel, nextOffset),
                                     countdown);
+                                //步骤3：修改offset
                                 ScheduleMessageService.this.updateOffset(this.delayLevel, nextOffset);
                                 return;
                             }
                         } // end of for
 
+                        //队列所有消息都扫描结束后，100L后开启下一轮扫描
                         nextOffset = offset + (i / ConsumeQueue.CQ_STORE_UNIT_SIZE);
                         ScheduleMessageService.this.timer.schedule(new DeliverDelayedMessageTimerTask(
                             this.delayLevel, nextOffset), DELAY_FOR_A_WHILE);
